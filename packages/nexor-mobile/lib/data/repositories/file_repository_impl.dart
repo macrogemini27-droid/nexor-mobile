@@ -1,85 +1,67 @@
-import 'package:dio/dio.dart';
 import 'dart:developer' as developer;
 import '../../domain/entities/file_node.dart';
 import '../../domain/entities/file_content.dart';
 import '../../domain/repositories/file_repository.dart';
-import '../../domain/repositories/server_repository.dart';
-import '../datasources/remote/api_client.dart';
-import '../models/file/file_node_model.dart';
-import '../models/file/file_content_model.dart';
-import '../../services/secure_storage_service.dart';
-import '../../core/utils/dio_error_handler.dart';
+import '../../core/ssh/ssh_client.dart';
+import '../../core/ssh/sftp_client.dart';
 
 class FileRepositoryImpl implements FileRepository {
-  final ServerRepository _serverRepository;
-  final SecureStorageService _secureStorage;
+  final SSHClient _sshClient;
+  final SFTPClient _sftpClient;
 
-  FileRepositoryImpl(this._serverRepository, [SecureStorageService? secureStorage])
-      : _secureStorage = secureStorage ?? SecureStorageService();
-
-  Future<ApiClient> _getApiClient(String serverId) async {
-    developer.log('Getting API client for server: $serverId');
-    final server = await _serverRepository.getServerById(serverId);
-    if (server == null) {
-      developer.log('ERROR: Server not found: $serverId');
-      throw Exception('Server not found');
-    }
-
-    // Use server.url which respects HTTPS setting
-    final baseUrl = server.url;
-    developer.log('Server URL: $baseUrl');
-    
-    // Get password from SecureStorage
-    final password = await _secureStorage.getPassword(serverId);
-    developer.log('Password retrieved: ${password != null ? "yes" : "no"}');
-    developer.log('Username: ${server.username ?? "none"}');
-
-    return ApiClient(
-      baseUrl: baseUrl,
-      username: server.username,
-      password: password,
-    );
-  }
+  FileRepositoryImpl(this._sshClient, this._sftpClient);
 
   @override
   Future<List<FileNode>> listFiles(String serverId, String path) async {
     try {
-      developer.log('Listing files for server: $serverId, path: $path');
-      final client = await _getApiClient(serverId);
-      developer.log('API client created, making request to /file');
+      developer.log('Listing files via SFTP: $path');
       
-      final response = await client.get(
-        '/file',
-        queryParameters: {'path': path},
-      );
-
-      developer.log('Response received: ${response.statusCode}');
-      final data = response.data;
-      
-      if (data is Map<String, dynamic> && data['files'] is List) {
-        final files = (data['files'] as List)
-            .map((json) => FileNodeModel.fromJson(json as Map<String, dynamic>))
-            .map((model) => model.toEntity())
-            .toList();
-
-        // Sort: directories first, then by name
-        files.sort((a, b) {
-          if (a.isDirectory && !b.isDirectory) return -1;
-          if (!a.isDirectory && b.isDirectory) return 1;
-          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-        });
-
-        developer.log('Successfully loaded ${files.length} files');
-        return files;
+      if (!_sshClient.isConnected) {
+        throw Exception('Not connected to SSH server');
       }
 
-      developer.log('Warning: Response data format unexpected');
-      return [];
-    } on DioException catch (e) {
-      developer.log('DioException in listFiles: ${DioErrorHandler.getDetailedError(e)}');
-      throw Exception(DioErrorHandler.getErrorMessage(e, context: 'Failed to list files'));
+      // Use SFTP to list directory
+      final items = await _sftpClient.listDirectory(path);
+      final files = <FileNode>[];
+
+      // Get metadata for each item
+      for (final item in items) {
+        if (item == '.' || item == '..') continue;
+        
+        final fullPath = path.endsWith('/') ? '$path$item' : '$path/$item';
+        try {
+          final metadata = await _sftpClient.getFileMetadata(fullPath);
+          files.add(FileNode(
+            name: item,
+            path: fullPath,
+            isDirectory: metadata.isDirectory,
+            size: metadata.size,
+            modifiedAt: metadata.modifiedTime,
+          ));
+        } catch (e) {
+          developer.log('Warning: Could not get metadata for $item: $e');
+          // Add without metadata
+          files.add(FileNode(
+            name: item,
+            path: fullPath,
+            isDirectory: false,
+            size: 0,
+            modifiedAt: null,
+          ));
+        }
+      }
+
+      // Sort: directories first, then by name
+      files.sort((a, b) {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+
+      developer.log('Successfully loaded ${files.length} files');
+      return files;
     } catch (e, stack) {
-      developer.log('Unexpected error in listFiles: $e\n$stack');
+      developer.log('Error listing files: $e\n$stack');
       throw Exception('Failed to list files: $e');
     }
   }
@@ -87,95 +69,175 @@ class FileRepositoryImpl implements FileRepository {
   @override
   Future<FileContent> readFile(String serverId, String path) async {
     try {
-      developer.log('Reading file: $path from server: $serverId');
-      final client = await _getApiClient(serverId);
-      final response = await client.get(
-        '/file/content',
-        queryParameters: {'path': path},
-      );
-
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        final model = FileContentModel.fromJson(data);
-        return model.toEntity();
+      developer.log('Reading file via SFTP: $path');
+      
+      if (!_sshClient.isConnected) {
+        throw Exception('Not connected to SSH server');
       }
 
-      throw Exception('Invalid response format');
-    } on DioException catch (e) {
-      developer.log('DioException in readFile: ${DioErrorHandler.getDetailedError(e)}');
-      throw Exception(DioErrorHandler.getErrorMessage(e, context: 'Failed to read file'));
+      final content = await _sftpClient.readFile(path);
+      final metadata = await _sftpClient.getFileMetadata(path);
+
+      return FileContent(
+        path: path,
+        content: content,
+        size: metadata.size,
+        modifiedAt: metadata.modifiedTime,
+      );
     } catch (e, stack) {
-      developer.log('Unexpected error in readFile: $e\n$stack');
+      developer.log('Error reading file: $e\n$stack');
       throw Exception('Failed to read file: $e');
     }
   }
 
   @override
-  Future<List<FileNode>> searchFiles(String serverId, String query) async {
+  Future<List<FileNode>> searchFiles(
+    String serverId,
+    String query, {
+    String? directory,
+  }) async {
     try {
-      final client = await _getApiClient(serverId);
-      final response = await client.get(
-        '/find/file',
-        queryParameters: {'query': query},
-      );
-
-      final data = response.data;
-      if (data is Map<String, dynamic> && data['results'] is List) {
-        return (data['results'] as List)
-            .map((json) => FileNodeModel.fromJson(json as Map<String, dynamic>))
-            .map((model) => model.toEntity())
-            .toList();
+      developer.log('Searching files via SSH: $query in ${directory ?? "/"}');
+      
+      if (!_sshClient.isConnected) {
+        throw Exception('Not connected to SSH server');
       }
 
-      return [];
-    } on DioException catch (e) {
-      developer.log('DioException in searchFiles: ${DioErrorHandler.getDetailedError(e)}');
-      throw Exception(DioErrorHandler.getErrorMessage(e, context: 'Failed to search files'));
+      final searchDir = directory ?? '/';
+      // Use find command to search for files
+      final command = 'find "$searchDir" -type f -name "*$query*" 2>/dev/null | head -100';
+      final result = await _sshClient.execute(command);
+
+      if (result.exitCode != 0) {
+        developer.log('Find command failed: ${result.stderr}');
+        return [];
+      }
+
+      final paths = result.stdout
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
+
+      final files = <FileNode>[];
+      for (final path in paths) {
+        try {
+          final metadata = await _sftpClient.getFileMetadata(path);
+          final name = path.split('/').last;
+          files.add(FileNode(
+            name: name,
+            path: path,
+            isDirectory: metadata.isDirectory,
+            size: metadata.size,
+            modifiedAt: metadata.modifiedTime,
+          ));
+        } catch (e) {
+          developer.log('Warning: Could not get metadata for $path: $e');
+        }
+      }
+
+      developer.log('Found ${files.length} matching files');
+      return files;
+    } catch (e, stack) {
+      developer.log('Error searching files: $e\n$stack');
+      throw Exception('Failed to search files: $e');
     }
   }
 
   @override
-  Future<List<FileNode>> searchContent(String serverId, String pattern) async {
+  Future<List<FileNode>> searchContent(
+    String serverId,
+    String query, {
+    String? directory,
+  }) async {
     try {
-      final client = await _getApiClient(serverId);
-      final response = await client.get(
-        '/find',
-        queryParameters: {'pattern': pattern},
-      );
-
-      final data = response.data;
-      if (data is Map<String, dynamic> && data['results'] is List) {
-        return (data['results'] as List)
-            .map((json) => FileNodeModel.fromJson(json as Map<String, dynamic>))
-            .map((model) => model.toEntity())
-            .toList();
+      developer.log('Searching content via SSH: $query in ${directory ?? "/"}');
+      
+      if (!_sshClient.isConnected) {
+        throw Exception('Not connected to SSH server');
       }
 
-      return [];
-    } on DioException catch (e) {
-      developer.log('DioException in searchContent: ${DioErrorHandler.getDetailedError(e)}');
-      throw Exception(DioErrorHandler.getErrorMessage(e, context: 'Failed to search content'));
+      final searchDir = directory ?? '/';
+      // Use grep to search file contents
+      final command = 'grep -rl "$query" "$searchDir" 2>/dev/null | head -100';
+      final result = await _sshClient.execute(command);
+
+      if (result.exitCode != 0 && result.exitCode != 1) {
+        developer.log('Grep command failed: ${result.stderr}');
+        return [];
+      }
+
+      final paths = result.stdout
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
+
+      final files = <FileNode>[];
+      for (final path in paths) {
+        try {
+          final metadata = await _sftpClient.getFileMetadata(path);
+          final name = path.split('/').last;
+          files.add(FileNode(
+            name: name,
+            path: path,
+            isDirectory: metadata.isDirectory,
+            size: metadata.size,
+            modifiedAt: metadata.modifiedTime,
+          ));
+        } catch (e) {
+          developer.log('Warning: Could not get metadata for $path: $e');
+        }
+      }
+
+      developer.log('Found ${files.length} files with matching content');
+      return files;
+    } catch (e, stack) {
+      developer.log('Error searching content: $e\n$stack');
+      throw Exception('Failed to search content: $e');
     }
   }
 
   @override
-  Future<Map<String, String>> getGitStatus(String serverId, String path) async {
+  Future<Map<String, dynamic>> getGitStatus(
+    String serverId,
+    String directory,
+  ) async {
     try {
-      final client = await _getApiClient(serverId);
-      final response = await client.get(
-        '/file/status',
-        queryParameters: {'path': path},
-      );
-
-      final data = response.data;
-      if (data is Map<String, dynamic> && data['files'] is Map) {
-        return Map<String, String>.from(data['files'] as Map);
+      developer.log('Getting git status via SSH: $directory');
+      
+      if (!_sshClient.isConnected) {
+        throw Exception('Not connected to SSH server');
       }
 
-      return {};
-    } on DioException catch (e) {
-      developer.log('DioException in getGitStatus: ${DioErrorHandler.getDetailedError(e)}');
-      throw Exception(DioErrorHandler.getErrorMessage(e, context: 'Failed to get git status'));
+      // Execute git status --porcelain
+      final result = await _sshClient.execute(
+        'git status --porcelain',
+        workingDirectory: directory,
+      );
+
+      if (result.exitCode != 0) {
+        developer.log('Git status failed: ${result.stderr}');
+        return {'files': []};
+      }
+
+      final lines = result.stdout
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
+
+      final files = lines.map((line) {
+        final status = line.substring(0, 2);
+        final path = line.substring(3);
+        return {
+          'path': path,
+          'status': status.trim(),
+        };
+      }).toList();
+
+      developer.log('Git status: ${files.length} changed files');
+      return {'files': files};
+    } catch (e, stack) {
+      developer.log('Error getting git status: $e\n$stack');
+      throw Exception('Failed to get git status: $e');
     }
   }
 }

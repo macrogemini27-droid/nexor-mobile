@@ -9,7 +9,6 @@ import '../../widgets/chat/user_message.dart';
 import '../../widgets/chat/ai_message.dart';
 import '../../widgets/chat/message_input.dart';
 import 'providers/chat_provider.dart';
-import 'providers/conversations_provider.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String sessionId;

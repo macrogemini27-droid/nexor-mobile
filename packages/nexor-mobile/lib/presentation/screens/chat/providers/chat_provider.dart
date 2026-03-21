@@ -1,7 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../../../../domain/entities/message.dart';
-import '../../../../core/utils/message_parser.dart';
-import 'conversations_provider.dart';
+import '../../../../core/session/session_processor.dart';
+import '../../../../data/database/app_database.dart';
 
 part 'chat_provider.g.dart';
 

@@ -9,7 +9,6 @@ import '../../widgets/common/enhanced_error_state.dart';
 import '../../widgets/common/nexor_app_bar.dart';
 import '../../widgets/common/nexor_button.dart';
 import '../../widgets/chat/conversation_card.dart';
-import 'providers/conversations_provider.dart';
 
 class ConversationListScreen extends ConsumerStatefulWidget {
   const ConversationListScreen({super.key});
