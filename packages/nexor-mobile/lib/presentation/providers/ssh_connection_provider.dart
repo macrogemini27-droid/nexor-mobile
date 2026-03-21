@@ -28,7 +28,7 @@ class SSHConnectionNotifier extends StateNotifier<AsyncValue<SSHSession?>> {
     // Check if already connected to same server
     if (_client.isConnected && _isSameConfig(config)) {
       // Reuse existing connection
-      final session = _client.session;
+      final session = _client.currentSession;
       if (session != null) {
         state = AsyncValue.data(session);
         return;

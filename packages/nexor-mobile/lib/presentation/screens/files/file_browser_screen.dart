@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/dimensions.dart';
+import '../../../core/theme/typography.dart';
 import '../../widgets/common/nexor_app_bar.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/enhanced_error_state.dart';
