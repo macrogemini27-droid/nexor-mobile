@@ -1,10 +1,10 @@
 name: nexor
 description: AI-powered mobile coding assistant that connects to OpenCode servers
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.0 <4.0.0'
+  sdk: ">=3.2.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -34,28 +34,28 @@ dependencies:
   timeago: ^3.6.0
 
   # SSH & SFTP
-  dartssh2: ^2.13.0
-  
+  dartssh2: ^2.8.2
+
   # Database
   drift: ^2.14.0
   sqlite3_flutter_libs: ^0.5.0
   path_provider: ^2.1.0
   path: ^1.9.0
-  
+
   # Utilities
   uuid: ^4.3.0
   equatable: ^2.0.5
-  
+
   # Code Highlighting
   flutter_highlight: ^0.7.0
   highlight: ^0.7.0
-  
+
   # Clipboard & Share
   share_plus: ^7.2.2
-  
+
   # File Type Detection
   mime: ^1.0.4
-  
+
   # Markdown
   flutter_markdown: ^0.6.18
   markdown: ^7.1.1
@@ -63,7 +63,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  
+
   build_runner: ^2.4.8
   drift_dev: ^2.14.0
   hive_generator: ^2.0.1
@@ -73,7 +73,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
+
   assets:
     - assets/images/
     - assets/fonts/
