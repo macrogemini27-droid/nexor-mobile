@@ -30,8 +30,8 @@ class _AddServerScreenState extends ConsumerState<AddServerScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _hostController = TextEditingController();
-  final _portController = TextEditingController(text: '4096');
-  final _usernameController = TextEditingController(text: 'opencode');
+  final _portController = TextEditingController(text: '22');
+  final _usernameController = TextEditingController(text: 'root');
   final _passwordController = TextEditingController();
   final _testConnection = TestConnection();
   final _secureStorage = SecureStorageService();

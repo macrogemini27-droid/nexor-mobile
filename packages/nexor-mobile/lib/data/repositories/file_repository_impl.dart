@@ -17,7 +17,7 @@ class FileRepositoryImpl implements FileRepository {
       developer.log('Listing files via SFTP: $path');
       
       if (!_sshClient.isConnected) {
-        throw Exception('Not connected to SSH server');
+        throw Exception('Not connected to SSH server. Please connect to the server first from the Servers screen.');
       }
 
       // Use SFTP to list directory
@@ -72,7 +72,7 @@ class FileRepositoryImpl implements FileRepository {
       developer.log('Reading file via SFTP: $path');
       
       if (!_sshClient.isConnected) {
-        throw Exception('Not connected to SSH server');
+        throw Exception('Not connected to SSH server. Please connect to the server first from the Servers screen.');
       }
 
       final content = await _sftpClient.readFile(path);
@@ -142,7 +142,7 @@ class FileRepositoryImpl implements FileRepository {
       developer.log('Searching files via SSH: $query in ${directory ?? "/"}');
       
       if (!_sshClient.isConnected) {
-        throw Exception('Not connected to SSH server');
+        throw Exception('Not connected to SSH server. Please connect to the server first from the Servers screen.');
       }
 
       final searchDir = directory ?? '/';
@@ -195,7 +195,7 @@ class FileRepositoryImpl implements FileRepository {
       developer.log('Searching content via SSH: $query in ${directory ?? "/"}');
       
       if (!_sshClient.isConnected) {
-        throw Exception('Not connected to SSH server');
+        throw Exception('Not connected to SSH server. Please connect to the server first from the Servers screen.');
       }
 
       final searchDir = directory ?? '/';
@@ -247,7 +247,7 @@ class FileRepositoryImpl implements FileRepository {
       developer.log('Getting git status via SSH: $directory');
       
       if (!_sshClient.isConnected) {
-        throw Exception('Not connected to SSH server');
+        throw Exception('Not connected to SSH server. Please connect to the server first from the Servers screen.');
       }
 
       // Execute git status --porcelain

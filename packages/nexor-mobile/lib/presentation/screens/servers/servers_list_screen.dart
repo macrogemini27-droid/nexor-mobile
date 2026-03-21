@@ -13,6 +13,8 @@ import '../../../domain/entities/server.dart';
 import '../../../domain/usecases/server/test_connection.dart';
 import '../../../services/secure_storage_service.dart';
 import 'providers/servers_provider.dart';
+import '../../providers/ssh_connection_provider.dart';
+import '../../../core/ssh/models/ssh_config.dart';
 
 /// Servers list screen
 class ServersListScreen extends ConsumerStatefulWidget {
@@ -139,8 +141,57 @@ class _ServersListScreenState extends ConsumerState<ServersListScreen> {
     }
   }
 
-  void _browseFiles(Server server) {
-    context.push('/files?serverId=${server.id}');
+  void _browseFiles(Server server) async {
+    // Show loading
+    setState(() => _testingServers.add(server.id));
+    
+    try {
+      // Get password
+      final password = await _secureStorage.getPassword(server.id);
+      
+      if (password == null || password.isEmpty) {
+        throw Exception('No password stored for this server');
+      }
+      
+      // Create SSH config
+      final sshConfig = SSHConfig(
+        host: server.host,
+        port: server.port,
+        username: server.username ?? 'root',
+        authType: SSHAuthType.password,
+        password: password,
+      );
+      
+      // Connect SSH
+      await ref.read(sshConnectionProvider.notifier).connect(sshConfig);
+      
+      // Wait for connection
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Check if connected
+      final sshClient = ref.read(sshClientProvider);
+      if (!sshClient.isConnected) {
+        throw Exception('Failed to establish SSH connection');
+      }
+      
+      // Navigate to file browser
+      if (mounted) {
+        context.push('/files?serverId=${server.id}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('SSH connection failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _testingServers.remove(server.id));
+      }
+    }
   }
 
   @override
