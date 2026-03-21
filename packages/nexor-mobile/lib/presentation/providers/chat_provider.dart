@@ -216,6 +216,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
   void clearError() {
     state = state.copyWith(error: null);
   }
+
+  void clearHistory() {
+    state = const ChatState();
+  }
 }
 
 // Chat Provider Factory

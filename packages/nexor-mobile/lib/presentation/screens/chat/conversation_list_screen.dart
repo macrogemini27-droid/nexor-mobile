@@ -10,6 +10,7 @@ import '../../widgets/common/nexor_app_bar.dart';
 import '../../widgets/common/nexor_button.dart';
 import '../../widgets/chat/conversation_card.dart';
 import '../../providers/session_provider.dart';
+import '../../../data/database/extensions/session_extensions.dart';
 
 class ConversationListScreen extends ConsumerStatefulWidget {
   const ConversationListScreen({super.key});
@@ -47,7 +48,7 @@ class _ConversationListScreenState
               title: 'No conversations yet',
               message: 'Start a new conversation to get started',
               action: NexorButton(
-                label: 'New Conversation',
+                text: 'New Conversation',
                 onPressed: () => context.push('/chat/new'),
                 icon: PhosphorIcons.plus(),
               ),
@@ -58,7 +59,8 @@ class _ConversationListScreenState
             padding: const EdgeInsets.all(16),
             itemCount: sessions.length,
             itemBuilder: (context, index) {
-              final session = sessions[index];
+              final sessionEntity = sessions[index];
+              final session = sessionEntity.toSession();
               return ConversationCard(
                 session: session,
                 onTap: () => context.push('/chat/${session.id}'),
@@ -73,8 +75,9 @@ class _ConversationListScreenState
         },
         loading: () => const LoadingIndicator(),
         error: (error, stack) => EnhancedErrorState(
-          error: error,
-          stackTrace: stack,
+          title: 'Failed to Load Conversations',
+          message: error.toString(),
+          technicalDetails: 'Error: $error\n\nStack Trace:\n$stack',
           onRetry: () => ref.invalidate(sessionProvider),
         ),
       ),

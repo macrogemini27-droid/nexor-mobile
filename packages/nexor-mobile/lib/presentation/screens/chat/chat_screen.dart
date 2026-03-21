@@ -10,6 +10,8 @@ import '../../widgets/chat/ai_message.dart';
 import '../../widgets/chat/message_input.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/session_provider.dart';
+import '../../../data/database/extensions/session_extensions.dart';
+import '../../providers/chat_message_extensions.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String sessionId;
@@ -66,7 +68,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _handleSendMessage(String content) {
-    ref.read(chatNotifierProvider(widget.sessionId).notifier).sendMessage(content);
+    ref.read(chatProvider(widget.sessionId).notifier).sendMessage(content);
 
     // Auto scroll to bottom after sending
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -79,16 +81,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final sessionAsync = ref.watch(currentSessionProvider);
-    final chatState = ref.watch(chatNotifierProvider(widget.sessionId));
-    final isStreaming = chatState.isStreaming;
+    final chatState = ref.watch(chatProvider(widget.sessionId));
+    final isStreaming = chatState.isProcessing;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: sessionAsync.when(
-        data: (session) => NexorAppBar(
-          title: session.displayTitle,
-          showBackButton: true,
-          actions: [
+        data: (sessionEntity) {
+          final session = sessionEntity?.toSession();
+          return NexorAppBar(
+            title: session?.displayTitle ?? 'Chat',
+            showBackButton: true,
+            actions: [
             if (isStreaming)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -130,7 +134,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ],
                       ),
                     );
-                    if (confirmed == true && mounted) {
+                     if (confirmed == true && mounted) {
                       ref
                           .read(chatProvider(widget.sessionId).notifier)
                           .clearHistory();
@@ -193,8 +197,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: messagesAsync.when(
-              data: (messages) {
+            child: Builder(
+              builder: (context) {
+                final messages = chatState.messages;
                 if (messages.isEmpty) {
                   return Center(
                     child: Column(
@@ -241,12 +246,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       itemCount: messages.length,
                       itemBuilder: (context, index) {
-                        final message = messages[index];
+                        final chatMessage = messages[index];
+                        final message = chatMessage.toMessage(widget.sessionId);
                         final isLastMessage = index == messages.length - 1;
                         final isStreamingThisMessage =
-                            isStreaming && isLastMessage && message.isAssistant;
+                            isStreaming && isLastMessage && chatMessage.role == 'assistant';
 
-                        if (message.isUser) {
+                        if (chatMessage.role == 'user') {
                           return UserMessage(message: message);
                         } else {
                           return AIMessage(
@@ -281,25 +287,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                       ),
                   ],
-                );
-              },
-              loading: () => const LoadingIndicator(),
-              error: (error, stack) {
-                final errorStr = error.toString();
-                String userMessage = errorStr;
-
-                if (errorStr.startsWith('Exception: ')) {
-                  userMessage = errorStr.substring('Exception: '.length);
-                }
-
-                final technicalDetails =
-                    'Error: $errorStr\n\nStack Trace:\n$stack';
-
-                return EnhancedErrorState(
-                  title: 'Failed to Load Messages',
-                  message: userMessage,
-                  technicalDetails: technicalDetails,
-                  onRetry: () => ref.invalidate(chatProvider(widget.sessionId)),
                 );
               },
             ),

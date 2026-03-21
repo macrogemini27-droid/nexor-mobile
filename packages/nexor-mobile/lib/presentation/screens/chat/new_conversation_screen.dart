@@ -62,12 +62,11 @@ class _NewConversationScreenState
     setState(() => _isCreating = true);
 
     try {
-      final session = await ref.read(conversationsProvider().notifier).create(
-            directory: _directoryController.text,
-            agent: _selectedAgent,
+      final session = await ref.read(sessionNotifierProvider.notifier).createSession(
             title: _titleController.text.isEmpty
-                ? null
+                ? 'New Conversation'
                 : _titleController.text,
+            directory: _directoryController.text,
           );
 
       if (mounted) {
