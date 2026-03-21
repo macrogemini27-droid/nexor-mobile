@@ -244,10 +244,14 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () {
-                        // Force load anyway
+                        // Force load anyway - invalidate provider to reload file
                         setState(() {
                           _forceLoadLargeFile = true;
                         });
+                        // Trigger reload
+                        ref.invalidate(
+                          fileContentProvider(widget.serverId, widget.filePath),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,

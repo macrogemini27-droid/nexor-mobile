@@ -34,7 +34,7 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
 class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen> {
   late String _currentPath;
   SortOption _sortOption = SortOption.nameAsc;
-  Set<FilterOption> _filters = {};
+  Set<FilterOption> _filters = {FilterOption.showHidden}; // Show all files by default including Arabic names
 
   @override
   void initState() {

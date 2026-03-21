@@ -26,24 +26,23 @@ class CodeBlock extends StatelessWidget {
 
     return Container(
       color: const Color(0xFF1E1E1E),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showLineNumbers)
-              Container(
-                width: lineNumberWidth,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF252526),
-                  border: Border(
-                    right: BorderSide(
-                      color: AppColors.border.withOpacity(0.3),
-                      width: 1,
-                    ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showLineNumbers)
+            Container(
+              width: lineNumberWidth,
+              decoration: BoxDecoration(
+                color: const Color(0xFF252526),
+                border: Border(
+                  right: BorderSide(
+                    color: AppColors.border.withOpacity(0.3),
+                    width: 1,
                   ),
                 ),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: List.generate(
@@ -63,21 +62,26 @@ class CodeBlock extends StatelessWidget {
                   ),
                 ),
               ),
-            Flexible(
-              child: HighlightView(
-                code,
-                language: language,
-                theme: vs2015Theme,
-                padding: const EdgeInsets.all(16),
-                textStyle: TextStyle(
-                  fontFamily: 'JetBrainsMono',
-                  fontSize: fontSize,
-                  height: 1.5,
+            ),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SingleChildScrollView(
+                child: HighlightView(
+                  code,
+                  language: language,
+                  theme: vs2015Theme,
+                  padding: const EdgeInsets.all(16),
+                  textStyle: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: fontSize,
+                    height: 1.5,
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

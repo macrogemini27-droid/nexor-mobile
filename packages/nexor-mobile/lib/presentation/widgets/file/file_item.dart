@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'dart:math' show min;
 import '../../../domain/entities/file_node.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
@@ -61,9 +62,12 @@ class FileItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Cap animation delay to prevent UI lag with many files (max 300ms)
+    final animationDelay = Duration(milliseconds: min(index * 30, 300));
+
     return FadeInUp(
       duration: const Duration(milliseconds: 300),
-      delay: Duration(milliseconds: index * 50),
+      delay: animationDelay,
       child: Slidable(
         key: ValueKey(file.path),
         enabled: !file.isDirectory,

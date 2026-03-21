@@ -21,18 +21,29 @@ class FileNode extends Equatable {
 
   String get extension {
     if (isDirectory) return '';
-    
+
     // Get filename only (not full path)
     final filename = name;
-    
-    // Hidden files without extension (e.g., .gitignore)
-    if (filename.startsWith('.') && !filename.substring(1).contains('.')) {
-      return '';
+
+    // Handle special cases for hidden files
+    if (filename.startsWith('.')) {
+      // Files like .gitignore, .env, .bashrc (no extension)
+      if (!filename.substring(1).contains('.')) {
+        return '';
+      }
+      // Files like .env.local, .config.json (has extension after first dot)
+      final parts = filename.substring(1).split('.');
+      return parts.length > 1 ? parts.last : '';
     }
-    
-    // Get extension from filename
+
+    // Handle multi-dot files like file.test.js, component.spec.ts
     final parts = filename.split('.');
-    return parts.length > 1 ? parts.last : '';
+    if (parts.length > 1) {
+      // Return last part as extension
+      return parts.last;
+    }
+
+    return '';
   }
 
   String get parentPath {

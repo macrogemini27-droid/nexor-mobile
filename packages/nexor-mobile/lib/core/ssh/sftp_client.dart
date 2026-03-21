@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'ssh_client.dart' as local;
@@ -36,9 +37,9 @@ class SFTPClient {
       final content = await file.readBytes();
       await file.close();
 
-      // Try to decode as UTF-8, if fails return base64 for binary files
+      // Try to decode as UTF-8, if fails throw error for binary files
       try {
-        return String.fromCharCodes(content);
+        return utf8.decode(content, allowMalformed: false);
       } catch (e) {
         // Binary file - return indicator
         throw Exception('Binary file cannot be displayed as text. Size: ${content.length} bytes');
@@ -87,8 +88,8 @@ class SFTPClient {
             SftpFileOpenMode.truncate,
       );
 
-      final bytes = Uint8List.fromList(content.codeUnits);
-      await file.writeBytes(bytes);
+      final bytes = utf8.encode(content);
+      await file.writeBytes(Uint8List.fromList(bytes));
       await file.close();
     } catch (e) {
       throw Exception('Failed to write file "$filePath": $e');
@@ -111,8 +112,8 @@ class SFTPClient {
             SftpFileOpenMode.append,
       );
 
-      final bytes = Uint8List.fromList(content.codeUnits);
-      await file.writeBytes(bytes);
+      final bytes = utf8.encode(content);
+      await file.writeBytes(Uint8List.fromList(bytes));
       await file.close();
     } catch (e) {
       throw Exception('Failed to append to file "$filePath": $e');
