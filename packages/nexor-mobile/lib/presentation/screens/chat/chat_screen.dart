@@ -184,7 +184,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ],
             ),
           ],
-        ),
+          );
+        },
         loading: () => NexorAppBar(
           title: 'Loading...',
           showBackButton: true,
