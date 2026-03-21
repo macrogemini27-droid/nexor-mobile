@@ -36,7 +36,7 @@ class FileRepositoryImpl implements FileRepository {
             path: fullPath,
             isDirectory: metadata.isDirectory,
             size: metadata.size,
-            modifiedAt: metadata.modifiedTime,
+            modifiedAt: metadata.modifiedTime ?? DateTime.now(),
           ));
         } catch (e) {
           developer.log('Warning: Could not get metadata for $item: $e');
@@ -46,7 +46,7 @@ class FileRepositoryImpl implements FileRepository {
             path: fullPath,
             isDirectory: false,
             size: 0,
-            modifiedAt: null,
+            modifiedAt: DateTime.now(),
           ));
         }
       }
@@ -77,17 +77,59 @@ class FileRepositoryImpl implements FileRepository {
 
       final content = await _sftpClient.readFile(path);
       final metadata = await _sftpClient.getFileMetadata(path);
+      
+      // Detect language from file extension
+      final extension = path.split('.').last.toLowerCase();
+      final language = _detectLanguage(extension);
+      
+      // Count lines
+      final lines = content.split('\n').length;
 
       return FileContent(
-        path: path,
         content: content,
+        language: language,
+        lines: lines,
         size: metadata.size,
-        modifiedAt: metadata.modifiedTime,
+        encoding: 'utf-8',
       );
     } catch (e, stack) {
       developer.log('Error reading file: $e\n$stack');
       throw Exception('Failed to read file: $e');
     }
+  }
+
+  String _detectLanguage(String extension) {
+    const languageMap = {
+      'dart': 'dart',
+      'js': 'javascript',
+      'ts': 'typescript',
+      'py': 'python',
+      'java': 'java',
+      'kt': 'kotlin',
+      'swift': 'swift',
+      'go': 'go',
+      'rs': 'rust',
+      'c': 'c',
+      'cpp': 'cpp',
+      'h': 'c',
+      'hpp': 'cpp',
+      'cs': 'csharp',
+      'php': 'php',
+      'rb': 'ruby',
+      'sh': 'bash',
+      'bash': 'bash',
+      'zsh': 'bash',
+      'json': 'json',
+      'xml': 'xml',
+      'html': 'html',
+      'css': 'css',
+      'scss': 'scss',
+      'yaml': 'yaml',
+      'yml': 'yaml',
+      'md': 'markdown',
+      'sql': 'sql',
+    };
+    return languageMap[extension] ?? 'plaintext';
   }
 
   @override
@@ -128,7 +170,7 @@ class FileRepositoryImpl implements FileRepository {
             path: path,
             isDirectory: metadata.isDirectory,
             size: metadata.size,
-            modifiedAt: metadata.modifiedTime,
+            modifiedAt: metadata.modifiedTime ?? DateTime.now(),
           ));
         } catch (e) {
           developer.log('Warning: Could not get metadata for $path: $e');
@@ -181,7 +223,7 @@ class FileRepositoryImpl implements FileRepository {
             path: path,
             isDirectory: metadata.isDirectory,
             size: metadata.size,
-            modifiedAt: metadata.modifiedTime,
+            modifiedAt: metadata.modifiedTime ?? DateTime.now(),
           ));
         } catch (e) {
           developer.log('Warning: Could not get metadata for $path: $e');
@@ -197,7 +239,7 @@ class FileRepositoryImpl implements FileRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> getGitStatus(
+  Future<Map<String, String>> getGitStatus(
     String serverId,
     String directory,
   ) async {
@@ -216,7 +258,7 @@ class FileRepositoryImpl implements FileRepository {
 
       if (result.exitCode != 0) {
         developer.log('Git status failed: ${result.stderr}');
-        return {'files': []};
+        return {};
       }
 
       final lines = result.stdout
@@ -224,17 +266,16 @@ class FileRepositoryImpl implements FileRepository {
           .where((line) => line.trim().isNotEmpty)
           .toList();
 
-      final files = lines.map((line) {
-        final status = line.substring(0, 2);
+      final statusMap = <String, String>{};
+      for (final line in lines) {
+        if (line.length < 3) continue;
+        final status = line.substring(0, 2).trim();
         final path = line.substring(3);
-        return {
-          'path': path,
-          'status': status.trim(),
-        };
-      }).toList();
+        statusMap[path] = status;
+      }
 
-      developer.log('Git status: ${files.length} changed files');
-      return {'files': files};
+      developer.log('Git status: ${statusMap.length} changed files');
+      return statusMap;
     } catch (e, stack) {
       developer.log('Error getting git status: $e\n$stack');
       throw Exception('Failed to get git status: $e');
