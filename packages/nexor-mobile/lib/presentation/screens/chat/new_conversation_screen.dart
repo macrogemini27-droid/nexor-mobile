@@ -6,6 +6,7 @@ import '../../../core/theme/colors.dart';
 import '../../widgets/common/nexor_app_bar.dart';
 import '../../widgets/common/nexor_button.dart';
 import '../../widgets/common/nexor_input.dart';
+import '../../providers/session_provider.dart';
 
 class NewConversationScreen extends ConsumerStatefulWidget {
   final String? initialDirectory;
