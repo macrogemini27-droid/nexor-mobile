@@ -1,0 +1,221 @@
+name: Nexor Mobile Build
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - "packages/nexor-mobile/**"
+      - ".github/workflows/nexor-mobile.yml"
+  pull_request:
+    paths:
+      - "packages/nexor-mobile/**"
+      - ".github/workflows/nexor-mobile.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/nexor-mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.19.0"
+          channel: "stable"
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code (Drift & Riverpod)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Run tests
+        run: flutter test
+        continue-on-error: true
+
+      - name: Build Android APK (Debug)
+        run: flutter build apk --debug --split-per-abi
+
+      - name: Build Android APK (Release)
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload Debug APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexor-mobile-debug-apk
+          path: packages/nexor-mobile/build/app/outputs/flutter-apk/app-*-debug.apk
+          retention-days: 30
+
+      - name: Upload Release APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexor-mobile-release-apk
+          path: packages/nexor-mobile/build/app/outputs/flutter-apk/app-*-release.apk
+          retention-days: 90
+
+      - name: Build Android App Bundle (Release)
+        run: flutter build appbundle --release
+
+      - name: Upload App Bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexor-mobile-app-bundle
+          path: packages/nexor-mobile/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 90
+
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: packages/nexor-mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.19.0"
+          channel: "stable"
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code (Drift & Riverpod)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Run tests
+        run: flutter test
+        continue-on-error: true
+
+      - name: Build iOS (No Codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Create IPA archive
+        run: |
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -r nexor-mobile.ipa Payload
+          rm -rf Payload
+
+      - name: Upload iOS IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexor-mobile-ios-ipa
+          path: packages/nexor-mobile/build/ios/iphoneos/nexor-mobile.ipa
+          retention-days: 90
+
+  lint:
+    name: Lint & Analyze
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/nexor-mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.19.0"
+          channel: "stable"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze code
+        run: flutter analyze
+
+      - name: Check formatting
+        run: dart format --set-exit-if-changed .
+
+  release:
+    name: Create Release
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from pubspec.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' packages/nexor-mobile/pubspec.yaml | cut -d ' ' -f 2 | cut -d '+' -f 1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=nexor-mobile-v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download Android APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: nexor-mobile-release-apk
+          path: ./artifacts/android
+
+      - name: Download Android App Bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: nexor-mobile-app-bundle
+          path: ./artifacts/bundle
+
+      - name: Download iOS IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nexor-mobile-ios-ipa
+          path: ./artifacts/ios
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Nexor Mobile v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
+          generate_release_notes: true
+          files: |
+            ./artifacts/android/*.apk
+            ./artifacts/bundle/*.aab
+            ./artifacts/ios/*.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,13 @@
+targets:
+  $default:
+    builders:
+      riverpod_generator:
+        options:
+          # Generate code for Riverpod providers
+          generate_for:
+            - lib/**/*.dart
+      hive_generator:
+        options:
+          # Generate code for Hive type adapters
+          generate_for:
+            - lib/data/models/**/*.dart
