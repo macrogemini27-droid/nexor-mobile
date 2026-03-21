@@ -8,7 +8,8 @@ import '../../widgets/common/nexor_app_bar.dart';
 import '../../widgets/chat/user_message.dart';
 import '../../widgets/chat/ai_message.dart';
 import '../../widgets/chat/message_input.dart';
-import 'providers/chat_provider.dart';
+import '../../providers/chat_provider.dart';
+import '../../providers/session_provider.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String sessionId;
@@ -65,7 +66,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _handleSendMessage(String content) {
-    ref.read(chatProvider(widget.sessionId).notifier).sendMessage(content);
+    ref.read(chatNotifierProvider(widget.sessionId).notifier).sendMessage(content);
 
     // Auto scroll to bottom after sending
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -77,9 +78,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sessionAsync = ref.watch(sessionProvider(widget.sessionId));
-    final messagesAsync = ref.watch(chatProvider(widget.sessionId));
-    final isStreaming = ref.watch(streamingStateProvider(widget.sessionId));
+    final sessionAsync = ref.watch(currentSessionProvider);
+    final chatState = ref.watch(chatNotifierProvider(widget.sessionId));
+    final isStreaming = chatState.isStreaming;
 
     return Scaffold(
       backgroundColor: AppColors.background,
