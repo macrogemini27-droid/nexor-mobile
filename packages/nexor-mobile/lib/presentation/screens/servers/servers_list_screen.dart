@@ -146,6 +146,9 @@ class _ServersListScreenState extends ConsumerState<ServersListScreen> {
     setState(() => _testingServers.add(server.id));
     
     try {
+      // Check if already connected to this server
+      final connectionNotifier = ref.read(sshConnectionProvider.notifier);
+      
       // Get password
       final password = await _secureStorage.getPassword(server.id);
       
@@ -162,19 +165,15 @@ class _ServersListScreenState extends ConsumerState<ServersListScreen> {
         password: password,
       );
       
-      // Connect SSH
-      await ref.read(sshConnectionProvider.notifier).connect(sshConfig);
-      
-      // Wait for connection
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Connect SSH (will reuse if already connected to same server)
+      await connectionNotifier.connect(sshConfig);
       
       // Check if connected
-      final sshClient = ref.read(sshClientProvider);
-      if (!sshClient.isConnected) {
+      if (!connectionNotifier.isConnected) {
         throw Exception('Failed to establish SSH connection');
       }
       
-      // Navigate to file browser
+      // Navigate to file browser immediately
       if (mounted) {
         context.push('/files?serverId=${server.id}');
       }
@@ -184,6 +183,7 @@ class _ServersListScreenState extends ConsumerState<ServersListScreen> {
           SnackBar(
             content: Text('SSH connection failed: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

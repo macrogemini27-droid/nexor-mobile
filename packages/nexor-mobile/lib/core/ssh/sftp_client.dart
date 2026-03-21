@@ -146,7 +146,7 @@ class SFTPClient {
             : null,
         isDirectory: stat.isDirectory,
         isFile: stat.isFile,
-        permissions: (stat.mode ?? 0) as int,
+        permissions: stat.mode?.value ?? 0,
       );
     } catch (e) {
       throw Exception('Failed to get metadata for "$filePath": $e');
