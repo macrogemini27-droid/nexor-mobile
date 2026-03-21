@@ -35,6 +35,9 @@ dependencies:
   # UI
   phosphor_flutter: ^2.1.0
   timeago: ^3.6.0
+  animate_do: ^3.3.4
+  shimmer: ^3.0.0
+  flutter_slidable: ^3.1.0
 
   # SSH & SFTP
   dartssh2: ^2.8.2
