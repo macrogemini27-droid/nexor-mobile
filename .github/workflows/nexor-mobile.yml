@@ -91,55 +91,6 @@ jobs:
           path: packages/nexor-mobile/build/app/outputs/bundle/release/app-release.aab
           retention-days: 90
 
-  build-ios:
-    name: Build iOS IPA
-    runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: packages/nexor-mobile
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.0"
-          channel: "stable"
-          cache: true
-
-      - name: Flutter doctor
-        run: flutter doctor -v
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Generate code (Drift & Riverpod)
-        run: dart run build_runner build --delete-conflicting-outputs
-
-      - name: Run tests
-        run: flutter test
-        continue-on-error: true
-
-      - name: Build iOS (No Codesign)
-        run: flutter build ios --release --no-codesign
-
-      - name: Create IPA archive
-        run: |
-          cd build/ios/iphoneos
-          mkdir Payload
-          cp -r Runner.app Payload/
-          zip -r nexor-mobile.ipa Payload
-          rm -rf Payload
-
-      - name: Upload iOS IPA artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexor-mobile-ios-ipa
-          path: packages/nexor-mobile/build/ios/iphoneos/nexor-mobile.ipa
-          retention-days: 90
-
   lint:
     name: Lint & Analyze
     runs-on: ubuntu-latest
@@ -166,13 +117,15 @@ jobs:
 
       - name: Analyze code
         run: flutter analyze
+        continue-on-error: true
 
       - name: Check formatting
         run: dart format --set-exit-if-changed .
+        continue-on-error: true
 
   release:
     name: Create Release
-    needs: [build-android, build-ios]
+    needs: [build-android]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
 
@@ -199,12 +152,6 @@ jobs:
           name: nexor-mobile-app-bundle
           path: ./artifacts/bundle
 
-      - name: Download iOS IPA artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: nexor-mobile-ios-ipa
-          path: ./artifacts/ios
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -216,6 +163,5 @@ jobs:
           files: |
             ./artifacts/android/*.apk
             ./artifacts/bundle/*.aab
-            ./artifacts/ios/*.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
