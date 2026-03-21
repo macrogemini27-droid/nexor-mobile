@@ -6,6 +6,7 @@ import '../../../../data/repositories/file_repository_impl.dart';
 import '../../../../core/ssh/ssh_client.dart';
 import '../../../../core/ssh/sftp_client.dart';
 import '../../../providers/ssh_connection_provider.dart';
+import 'dart:async';
 
 part 'files_provider.g.dart';
 
@@ -18,14 +19,26 @@ FileRepository fileRepository(FileRepositoryRef ref) {
 
 @riverpod
 class Files extends _$Files {
+  Timer? _debounceTimer;
+  
   @override
   Future<List<FileNode>> build(String serverId, String path) async {
+    ref.onDispose(() {
+      _debounceTimer?.cancel();
+    });
+    
     final repository = ref.watch(fileRepositoryProvider);
     return await repository.listFiles(serverId, path);
   }
 
   Future<void> refresh() async {
-    ref.invalidateSelf();
+    // Cancel any pending refresh
+    _debounceTimer?.cancel();
+    
+    // Debounce rapid refresh calls
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      ref.invalidateSelf();
+    });
   }
 }
 

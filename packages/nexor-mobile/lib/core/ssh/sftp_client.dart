@@ -36,7 +36,13 @@ class SFTPClient {
       final content = await file.readBytes();
       await file.close();
 
-      return String.fromCharCodes(content);
+      // Try to decode as UTF-8, if fails return base64 for binary files
+      try {
+        return String.fromCharCodes(content);
+      } catch (e) {
+        // Binary file - return indicator
+        throw Exception('Binary file cannot be displayed as text. Size: ${content.length} bytes');
+      }
     } catch (e) {
       throw Exception('Failed to read file "$filePath": $e');
     }

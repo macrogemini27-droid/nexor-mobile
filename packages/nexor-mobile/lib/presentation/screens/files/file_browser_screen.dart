@@ -316,6 +316,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen> {
           'Open in Nexor',
           style: TextStyle(color: Colors.white),
         ),
+        onPressed: () {
+          // TODO: Implement open in Nexor chat
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Coming soon')),
+          );
+        },
       ),
     );
   }

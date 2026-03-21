@@ -21,7 +21,17 @@ class FileNode extends Equatable {
 
   String get extension {
     if (isDirectory) return '';
-    final parts = path.split('.');
+    
+    // Get filename only (not full path)
+    final filename = name;
+    
+    // Hidden files without extension (e.g., .gitignore)
+    if (filename.startsWith('.') && !filename.substring(1).contains('.')) {
+      return '';
+    }
+    
+    // Get extension from filename
+    final parts = filename.split('.');
     return parts.length > 1 ? parts.last : '';
   }
 

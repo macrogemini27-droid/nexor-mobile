@@ -31,6 +31,7 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
   double _fontSize = 14;
   bool _showLineNumbers = true;
   bool _wrapLines = false;
+  bool _forceLoadLargeFile = false;
 
   void _increaseFontSize() {
     if (_fontSize < 24) {
@@ -215,7 +216,7 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
       ),
       body: fileContentAsync.when(
         data: (fileContent) {
-          if (fileContent.isLarge) {
+          if (fileContent.isLarge && !_forceLoadLargeFile) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -244,7 +245,9 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
                     ElevatedButton(
                       onPressed: () {
                         // Force load anyway
-                        setState(() {});
+                        setState(() {
+                          _forceLoadLargeFile = true;
+                        });
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -344,5 +347,11 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    // Clean up resources
+    super.dispose();
   }
 }

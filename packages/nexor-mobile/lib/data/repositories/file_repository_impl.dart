@@ -145,9 +145,11 @@ class FileRepositoryImpl implements FileRepository {
         throw Exception('Not connected to SSH server. Please connect to the server first from the Servers screen.');
       }
 
-      final searchDir = directory ?? '/';
+      final searchDir = _sanitizePath(directory ?? '/');
+      final sanitizedQuery = _sanitizeSearchQuery(query);
+      
       // Use find command to search for files
-      final command = 'find "$searchDir" -type f -name "*$query*" 2>/dev/null | head -100';
+      final command = 'find "$searchDir" -type f -name "*$sanitizedQuery*" 2>/dev/null | head -100';
       final result = await _sshClient.execute(command);
 
       if (result.exitCode != 0) {
@@ -198,9 +200,11 @@ class FileRepositoryImpl implements FileRepository {
         throw Exception('Not connected to SSH server. Please connect to the server first from the Servers screen.');
       }
 
-      final searchDir = directory ?? '/';
+      final searchDir = _sanitizePath(directory ?? '/');
+      final sanitizedQuery = _sanitizeSearchQuery(query);
+      
       // Use grep to search file contents
-      final command = 'grep -rl "$query" "$searchDir" 2>/dev/null | head -100';
+      final command = 'grep -rl "$sanitizedQuery" "$searchDir" 2>/dev/null | head -100';
       final result = await _sshClient.execute(command);
 
       if (result.exitCode != 0 && result.exitCode != 1) {
@@ -280,5 +284,45 @@ class FileRepositoryImpl implements FileRepository {
       developer.log('Error getting git status: $e\n$stack');
       throw Exception('Failed to get git status: $e');
     }
+  }
+
+  /// Sanitize path to prevent path traversal attacks
+  String _sanitizePath(String path) {
+    // Remove any attempts to escape directory
+    final sanitized = path
+        .replaceAll('..', '')
+        .replaceAll(';', '')
+        .replaceAll('&', '')
+        .replaceAll('|', '')
+        .replaceAll('`', '')
+        .replaceAll('\$', '')
+        .replaceAll('(', '')
+        .replaceAll(')', '');
+    
+    // Ensure path starts with /
+    if (!sanitized.startsWith('/')) {
+      return '/$sanitized';
+    }
+    
+    return sanitized;
+  }
+
+  /// Sanitize search query to prevent command injection
+  String _sanitizeSearchQuery(String query) {
+    // Remove shell special characters
+    return query
+        .replaceAll('"', '')
+        .replaceAll("'", '')
+        .replaceAll('`', '')
+        .replaceAll('\$', '')
+        .replaceAll(';', '')
+        .replaceAll('&', '')
+        .replaceAll('|', '')
+        .replaceAll('>', '')
+        .replaceAll('<', '')
+        .replaceAll('(', '')
+        .replaceAll(')', '')
+        .replaceAll('\n', '')
+        .replaceAll('\r', '');
   }
 }
