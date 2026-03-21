@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'dart:developer' as developer;
-import 'package:dio/dio.dart';
 import '../../entities/server.dart';
-import '../../../core/utils/dio_error_handler.dart';
+import '../../../core/ssh/ssh_client.dart';
+import '../../../core/ssh/models/ssh_config.dart';
 
 /// Connection test result
 class ConnectionTestResult {
@@ -17,96 +16,94 @@ class ConnectionTestResult {
   });
 }
 
-/// Use case: Test server connection
+/// Use case: Test server connection via SSH
 class TestConnection {
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
-      validateStatus: (status) => status != null && status < 500,
-    ),
-  );
-
   Future<ConnectionTestResult> call(Server server, {String? password}) async {
     final startTime = DateTime.now();
 
     try {
-      developer.log('Testing connection to: ${server.url}');
-      developer.log('Username: ${server.username ?? "none"}');
+      developer.log('Testing SSH connection to: ${server.host}:${server.port}');
+      developer.log('Username: ${server.username ?? "root"}');
       developer.log('Password provided: ${password != null ? "yes" : "no"}');
-      developer.log('HTTPS: ${server.useHttps}');
       
-      final options = Options();
-
-      // Add Basic Auth if credentials provided
-      if (server.username != null && password != null) {
-        final credentials = '${server.username}:$password';
-        final encoded = base64Encode(utf8.encode(credentials));
-        options.headers = {'Authorization': 'Basic $encoded'};
-        developer.log('Basic Auth header added');
+      if (password == null || password.isEmpty) {
+        return ConnectionTestResult(
+          success: false,
+          errorMessage: 'Password is required for SSH connection',
+        );
       }
 
-      // Try multiple endpoints to test connection
-      final endpoints = ['/health', '/', '/api'];
-      Response? response;
-      String? successEndpoint;
+      // Create SSH config
+      final sshConfig = SSHConfig(
+        host: server.host,
+        port: server.port,
+        username: server.username ?? 'root',
+        authType: SSHAuthType.password,
+        password: password,
+        timeout: const Duration(seconds: 30),
+      );
+
+      // Create SSH client and test connection
+      final sshClient = SSHClient();
       
-      for (final endpoint in endpoints) {
-        try {
-          developer.log('Trying endpoint: ${server.url}$endpoint');
-          response = await _dio.get(
-            '${server.url}$endpoint',
-            options: options,
+      try {
+        await sshClient.connect(sshConfig);
+        
+        if (!sshClient.isConnected) {
+          return ConnectionTestResult(
+            success: false,
+            errorMessage: 'Failed to establish SSH connection',
           );
-          successEndpoint = endpoint;
-          developer.log('Success! Endpoint $endpoint returned ${response.statusCode}');
-          break; // Success, exit loop
-        } catch (e) {
-          developer.log('Endpoint $endpoint failed: $e');
-          // Try next endpoint
-          if (endpoint == endpoints.last) {
-            rethrow; // Last endpoint failed, rethrow
-          }
         }
-      }
 
-      final latency = DateTime.now().difference(startTime).inMilliseconds;
+        // Test a simple command to verify connection works
+        final result = await sshClient.execute('echo "test"');
+        
+        if (result.exitCode != 0) {
+          await sshClient.disconnect();
+          return ConnectionTestResult(
+            success: false,
+            errorMessage: 'SSH connected but command execution failed',
+          );
+        }
 
-      if (response != null && (response.statusCode == 200 || 
-          response.statusCode == 404 || 
-          response.statusCode == 403)) {
-        // 404/403 acceptable - server is reachable
-        developer.log('Connection test PASSED (${response.statusCode}) via $successEndpoint in ${latency}ms');
+        // Disconnect after test
+        await sshClient.disconnect();
+
+        final latency = DateTime.now().difference(startTime).inMilliseconds;
+        developer.log('SSH connection test successful. Latency: ${latency}ms');
+
         return ConnectionTestResult(
           success: true,
           latencyMs: latency,
         );
-      } else if (response?.statusCode == 401) {
-        developer.log('Connection test FAILED: 401 Unauthorized');
+      } catch (e) {
+        developer.log('SSH connection error: $e');
+        await sshClient.disconnect();
+        
+        String errorMessage = 'SSH connection failed: $e';
+        
+        // Provide more specific error messages
+        if (e.toString().contains('Authentication')) {
+          errorMessage = 'Authentication failed. Please check your username and password.';
+        } else if (e.toString().contains('timeout')) {
+          errorMessage = 'Connection timeout. Please check the host and port.';
+        } else if (e.toString().contains('refused')) {
+          errorMessage = 'Connection refused. Make sure SSH server is running on port ${server.port}.';
+        } else if (e.toString().contains('host')) {
+          errorMessage = 'Cannot reach host. Please check the hostname or IP address.';
+        }
+        
         return ConnectionTestResult(
           success: false,
-          errorMessage: 'Authentication failed. Check username and password.',
-        );
-      } else {
-        developer.log('Connection test FAILED: Unexpected status ${response?.statusCode}');
-        return ConnectionTestResult(
-          success: false,
-          errorMessage: 'Server returned status code: ${response?.statusCode}',
+          errorMessage: errorMessage,
         );
       }
-    } on DioException catch (e) {
-      developer.log('DioException in test connection: ${DioErrorHandler.getDetailedError(e)}');
-      final errorMessage = DioErrorHandler.getErrorMessage(e);
-
-      return ConnectionTestResult(
-        success: false,
-        errorMessage: errorMessage,
-      );
     } catch (e, stack) {
-      developer.log('Unexpected error in test connection: $e\n$stack');
+      developer.log('Error testing SSH connection: $e\n$stack');
       return ConnectionTestResult(
         success: false,
-        errorMessage: 'Unexpected error: $e',
+        errorMessage: 'Connection test failed: $e',
       );
     }
   }
