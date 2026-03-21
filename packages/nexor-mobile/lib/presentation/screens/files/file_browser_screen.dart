@@ -299,12 +299,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // FUTURE: Open current directory in Nexor chat
-          // This will create a new chat session with the current directory as context
+          // TODO: Implement open in Nexor chat
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Opening in Nexor...'),
-            ),
+            const SnackBar(content: Text('Coming soon')),
           );
         },
         backgroundColor: AppColors.primary,
@@ -316,12 +313,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen> {
           'Open in Nexor',
           style: TextStyle(color: Colors.white),
         ),
-        onPressed: () {
-          // TODO: Implement open in Nexor chat
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Coming soon')),
-          );
-        },
       ),
     );
   }
