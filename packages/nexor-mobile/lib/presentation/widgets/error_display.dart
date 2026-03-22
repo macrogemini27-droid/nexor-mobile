@@ -163,17 +163,6 @@ class ErrorDisplay extends StatelessWidget {
       );
     }
 
-    if (error is TimeoutException) {
-      return _ErrorInfo(
-        icon: Icons.timer_off,
-        title: 'Operation Timed Out',
-        message: 'The operation took too long to complete',
-        details: error.operation,
-        retryable: true,
-        needsReconnect: false,
-      );
-    }
-
     if (error is OperationTimeoutException) {
       return _ErrorInfo(
         icon: Icons.timer_off,

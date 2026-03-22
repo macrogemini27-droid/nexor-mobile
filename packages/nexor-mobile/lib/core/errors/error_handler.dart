@@ -34,11 +34,10 @@ class ErrorHandler {
       return _handleFileSystemError(error);
     }
     
-    // Generic exception
-    return AppException(
+    // Generic exception - use SftpException as concrete implementation
+    return SftpException(
       'An unexpected error occurred',
       details: error.toString(),
-      retryable: false,
     );
   }
   
@@ -98,10 +97,9 @@ class ErrorHandler {
       return OperationTimeoutException('file operation');
     }
     
-    return AppException(
+    return SftpException(
       'File system error',
       details: error.message,
-      retryable: false,
     );
   }
 }
