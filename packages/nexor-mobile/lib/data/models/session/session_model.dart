@@ -74,16 +74,25 @@ class SessionModel extends HiveObject {
 
   factory SessionModel.fromJson(Map<String, dynamic> json) {
     return SessionModel(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
       title: json['title'] as String?,
-      directory: json['directory'] as String,
+      directory: json['directory'] as String? ?? '',
       agent: json['agent'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: _parseDateTime(json['createdAt']),
+      updatedAt: _parseDateTime(json['updatedAt']),
       messageCount: json['messageCount'] as int? ?? 0,
       lastMessage: json['lastMessage'] as String?,
       projectPath: json['projectPath'] as String?,
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    try {
+      return DateTime.parse(value.toString());
+    } catch (e) {
+      return DateTime.now();
+    }
   }
 
   Map<String, dynamic> toJson() {

@@ -60,7 +60,7 @@ class _FileEditorWidgetState extends ConsumerState<FileEditorWidget> {
         throw Exception('Not connected to SSH server');
       }
 
-      final sftpClient = SFTPClient(client);
+      final sftpClient = SFTPClient(client, allowedRoot: '/home');
       final content = await sftpClient.readFile(widget.filePath);
 
       if (!mounted) return;
@@ -92,7 +92,7 @@ class _FileEditorWidgetState extends ConsumerState<FileEditorWidget> {
         throw Exception('Not connected to SSH server');
       }
 
-      final sftpClient = SFTPClient(client);
+      final sftpClient = SFTPClient(client, allowedRoot: '/home');
       await sftpClient.writeFile(widget.filePath, _contentController.text);
 
       if (!mounted) return;

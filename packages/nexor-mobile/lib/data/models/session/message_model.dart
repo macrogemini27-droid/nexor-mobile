@@ -56,17 +56,24 @@ class MessageModel extends HiveObject {
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(
-      id: json['id'] as String,
-      sessionId: json['sessionId'] as String,
-      role: json['role'] as String,
-      content: json['content'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      parts: json['parts'] != null
-          ? (json['parts'] as List)
-              .map((p) => MessagePartModel.fromJson(p as Map<String, dynamic>))
-              .toList()
-          : null,
+      id: json['id'] as String? ?? '',
+      sessionId: json['sessionId'] as String? ?? '',
+      role: json['role'] as String? ?? 'user',
+      content: json['content'] as String? ?? '',
+      createdAt: _parseDateTime(json['createdAt']),
+      parts: (json['parts'] as List?)
+          ?.map((p) => MessagePartModel.fromJson(p as Map<String, dynamic>? ?? {}))
+          .toList(),
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    try {
+      return DateTime.parse(value.toString());
+    } catch (e) {
+      return DateTime.now();
+    }
   }
 
   Map<String, dynamic> toJson() {

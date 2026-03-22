@@ -1,51 +1,73 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'ssh_client.dart' as local;
+import 'path_validator.dart';
+import '../errors/error_types.dart';
+import '../errors/error_handler.dart';
 
 class SFTPClient {
   final local.SSHClient _sshClient;
+  final String allowedRoot;
+  final Duration timeout;
   SftpClient? _sftpClient;
 
-  SFTPClient(this._sshClient);
+  SFTPClient(
+    this._sshClient, {
+    required this.allowedRoot,
+    this.timeout = const Duration(seconds: 30),
+  });
 
   /// Initialize SFTP session
   Future<void> _ensureConnected() async {
     if (_sftpClient != null) return;
 
     if (!_sshClient.isConnected) {
-      throw Exception('SSH client is not connected');
+      throw ConnectionException('SSH client is not connected');
     }
 
     final client = _sshClient.client;
     if (client == null) {
-      throw Exception('SSH client not available');
+      throw ConnectionException('SSH client not available');
     }
-    _sftpClient = await client.sftp();
+    
+    try {
+      _sftpClient = await client.sftp().timeout(timeout);
+    } on TimeoutException {
+      throw TimeoutException('SFTP connection');
+    } catch (e) {
+      throw ErrorHandler.handle(e, context: 'SFTP connection');
+    }
   }
 
   /// Read file content from remote server
   Future<String> readFile(String filePath) async {
+    final validated = PathValidator.validatePath(filePath, allowedRoot);
     await _ensureConnected();
 
+    final sftp = _sftpClient;
+    if (sftp == null) {
+      throw SftpException('SFTP client not initialized');
+    }
+
+    SftpFile? file;
     try {
-      final sftp = _sftpClient;
-      if (sftp == null) {
-        throw Exception('SFTP client not initialized');
-      }
-      final file = await sftp.open(filePath);
-      final content = await file.readBytes();
-      await file.close();
+      file = await sftp.open(validated).timeout(timeout);
+      final content = await file.readBytes().timeout(timeout);
 
       // Try to decode as UTF-8, if fails throw error for binary files
       try {
         return utf8.decode(content, allowMalformed: false);
       } catch (e) {
-        // Binary file - return indicator
-        throw Exception('Binary file cannot be displayed as text. Size: ${content.length} bytes');
+        throw BinaryFileException(content.length);
       }
+    } on TimeoutException {
+      throw TimeoutException('file read');
     } catch (e) {
-      throw Exception('Failed to read file "$filePath": $e');
+      throw ErrorHandler.handle(e, context: 'readFile');
+    } finally {
+      await file?.close();
     }
   }
 
@@ -74,49 +96,61 @@ class SFTPClient {
 
   /// Write content to file on remote server
   Future<void> writeFile(String filePath, String content) async {
+    final validated = PathValidator.validatePath(filePath, allowedRoot);
     await _ensureConnected();
 
+    final sftp = _sftpClient;
+    if (sftp == null) {
+      throw SftpException('SFTP client not initialized');
+    }
+
+    SftpFile? file;
     try {
-      final sftp = _sftpClient;
-      if (sftp == null) {
-        throw Exception('SFTP client not initialized');
-      }
-      final file = await sftp.open(
-        filePath,
+      file = await sftp.open(
+        validated,
         mode: SftpFileOpenMode.create |
             SftpFileOpenMode.write |
             SftpFileOpenMode.truncate,
-      );
+      ).timeout(timeout);
 
       final bytes = utf8.encode(content);
-      await file.writeBytes(Uint8List.fromList(bytes));
-      await file.close();
+      await file.writeBytes(Uint8List.fromList(bytes)).timeout(timeout);
+    } on TimeoutException {
+      throw TimeoutException('file write');
     } catch (e) {
-      throw Exception('Failed to write file "$filePath": $e');
+      throw ErrorHandler.handle(e, context: 'writeFile');
+    } finally {
+      await file?.close();
     }
   }
 
   /// Append content to file
   Future<void> appendFile(String filePath, String content) async {
+    final validated = PathValidator.validatePath(filePath, allowedRoot);
     await _ensureConnected();
 
+    final sftp = _sftpClient;
+    if (sftp == null) {
+      throw SftpException('SFTP client not initialized');
+    }
+
+    SftpFile? file;
     try {
-      final sftp = _sftpClient;
-      if (sftp == null) {
-        throw Exception('SFTP client not initialized');
-      }
-      final file = await sftp.open(
-        filePath,
+      file = await sftp.open(
+        validated,
         mode: SftpFileOpenMode.create |
             SftpFileOpenMode.write |
             SftpFileOpenMode.append,
-      );
+      ).timeout(timeout);
 
       final bytes = utf8.encode(content);
-      await file.writeBytes(Uint8List.fromList(bytes));
-      await file.close();
+      await file.writeBytes(Uint8List.fromList(bytes)).timeout(timeout);
+    } on TimeoutException {
+      throw TimeoutException('file append');
     } catch (e) {
-      throw Exception('Failed to append to file "$filePath": $e');
+      throw ErrorHandler.handle(e, context: 'appendFile');
+    } finally {
+      await file?.close();
     }
   }
 
@@ -129,8 +163,10 @@ class SFTPClient {
       if (sftp == null) {
         return false;
       }
-      await sftp.stat(filePath);
+      await sftp.stat(filePath).timeout(timeout);
       return true;
+    } on TimeoutException {
+      return false;
     } catch (e) {
       return false;
     }
@@ -138,14 +174,15 @@ class SFTPClient {
 
   /// Get file metadata
   Future<SftpFileMetadata> getFileMetadata(String filePath) async {
+    final validated = PathValidator.validatePath(filePath, allowedRoot);
     await _ensureConnected();
 
     try {
       final sftp = _sftpClient;
       if (sftp == null) {
-        throw Exception('SFTP client not initialized');
+        throw SftpException('SFTP client not initialized');
       }
-      final stat = await sftp.stat(filePath);
+      final stat = await sftp.stat(validated).timeout(timeout);
       return SftpFileMetadata(
         size: stat.size ?? 0,
         modifiedTime: stat.modifyTime != null
@@ -155,55 +192,66 @@ class SFTPClient {
         isFile: stat.isFile,
         permissions: stat.mode?.value ?? 0,
       );
+    } on TimeoutException {
+      throw TimeoutException('get metadata');
     } catch (e) {
-      throw Exception('Failed to get metadata for "$filePath": $e');
+      throw ErrorHandler.handle(e, context: 'getFileMetadata');
     }
   }
 
   /// List directory contents
   Future<List<String>> listDirectory(String dirPath) async {
+    final validated = PathValidator.validatePath(dirPath, allowedRoot);
     await _ensureConnected();
 
     try {
       final sftp = _sftpClient;
       if (sftp == null) {
-        throw Exception('SFTP client not initialized');
+        throw SftpException('SFTP client not initialized');
       }
-      final items = await sftp.listdir(dirPath);
+      final items = await sftp.listdir(validated).timeout(timeout);
       return items.map((item) => item.filename).toList();
+    } on TimeoutException {
+      throw TimeoutException('list directory');
     } catch (e) {
-      throw Exception('Failed to list directory "$dirPath": $e');
+      throw ErrorHandler.handle(e, context: 'listDirectory');
     }
   }
 
   /// Delete file
   Future<void> deleteFile(String filePath) async {
+    final validated = PathValidator.validatePath(filePath, allowedRoot);
     await _ensureConnected();
 
     try {
       final sftp = _sftpClient;
       if (sftp == null) {
-        throw Exception('SFTP client not initialized');
+        throw SftpException('SFTP client not initialized');
       }
-      await sftp.remove(filePath);
+      await sftp.remove(validated).timeout(timeout);
+    } on TimeoutException {
+      throw TimeoutException('file delete');
     } catch (e) {
-      throw Exception('Failed to delete file "$filePath": $e');
+      throw ErrorHandler.handle(e, context: 'deleteFile');
     }
   }
 
   /// Rename/move file
   Future<void> renameFile(String oldPath, String newPath) async {
+    final validatedOld = PathValidator.validatePath(oldPath, allowedRoot);
+    final validatedNew = PathValidator.validatePath(newPath, allowedRoot);
     await _ensureConnected();
 
     try {
       final sftp = _sftpClient;
       if (sftp == null) {
-        throw Exception('SFTP client not initialized');
+        throw SftpException('SFTP client not initialized');
       }
-      await sftp.rename(oldPath, newPath);
+      await sftp.rename(validatedOld, validatedNew).timeout(timeout);
+    } on TimeoutException {
+      throw TimeoutException('file rename');
     } catch (e) {
-      throw Exception(
-          'Failed to rename file from "$oldPath" to "$newPath": $e');
+      throw ErrorHandler.handle(e, context: 'renameFile');
     }
   }
 

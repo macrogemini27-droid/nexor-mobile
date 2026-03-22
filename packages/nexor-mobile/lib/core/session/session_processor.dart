@@ -68,12 +68,17 @@ class SessionProcessor {
       yield ProcessingEvent.status('Generating response...');
       
       final textBuffer = StringBuffer();
+      final blocks = <int, Map<String, dynamic>>{};
 
       await for (final event in aiProvider.streamText(
         messages: history,
         tools: toolRegistry.getToolDefinitions(),
       )) {
         if (event is ContentBlockStartEvent) {
+          blocks[event.index] = {
+            'type': event.blockType,
+            'data': event.data,
+          };
           if (event.blockType == 'tool_use') {
             yield ProcessingEvent.toolStart(
               event.data['name'] as String? ?? 'unknown',
@@ -87,14 +92,30 @@ class SessionProcessor {
             yield ProcessingEvent.status('Executing tool...');
           }
         } else if (event is ContentBlockStopEvent) {
-          if (textBuffer.isNotEmpty) {
-            await messageDao.createMessagePart(
-              id: _uuid.v4(),
-              messageId: assistantMsgId,
-              type: 'text',
-              content: textBuffer.toString(),
-            );
-            textBuffer.clear();
+          final block = blocks[event.index];
+          if (block != null) {
+            if (block['type'] == 'text' && textBuffer.isNotEmpty) {
+              await messageDao.createMessagePart(
+                id: _uuid.v4(),
+                messageId: assistantMsgId,
+                type: 'text',
+                content: textBuffer.toString(),
+              );
+              textBuffer.clear();
+            } else if (block['type'] == 'tool_use') {
+              final data = block['data'] as Map<String, dynamic>;
+              await messageDao.createMessagePart(
+                id: _uuid.v4(),
+                messageId: assistantMsgId,
+                type: 'tool_use',
+                content: data['name'] as String? ?? '',
+                metadata: {
+                  'id': data['id'] as String? ?? '',
+                  'name': data['name'] as String? ?? '',
+                  'input': data['input'] as Map<String, dynamic>? ?? {},
+                },
+              );
+            }
           }
         } else if (event is MessageStopEvent) {
           yield ProcessingEvent.status('Response complete');

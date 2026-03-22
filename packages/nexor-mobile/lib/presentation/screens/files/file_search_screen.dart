@@ -5,8 +5,10 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../domain/entities/file_node.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
+import '../../../core/errors/error_types.dart';
 import '../../widgets/common/loading_indicator.dart';
 import '../../widgets/common/empty_state.dart';
+import '../../widgets/error_display.dart';
 import '../../widgets/file/file_item.dart';
 import 'providers/file_search_provider.dart';
 
@@ -209,33 +211,22 @@ class _FileSearchScreenState extends ConsumerState<FileSearchScreen> {
                 );
               },
               loading: () => const Center(child: LoadingIndicator()),
-              error: (error, stack) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        PhosphorIconsRegular.warningCircle,
-                        size: 64,
-                        color: AppColors.error,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Search failed',
-                        style: AppTypography.h2,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        error.toString(),
-                        style: AppTypography.body.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
+              error: (error, stack) => ErrorDisplay(
+                error: error,
+                onRetry: error is AppException && error.retryable
+                    ? () {
+                        ref.invalidate(fileSearchProvider(
+                            widget.serverId, _query, _searchType));
+                      }
+                    : null,
+                onReconnect: error is ConnectionException || error is AuthException
+                    ? () {
+                        context.go('/servers');
+                      }
+                    : null,
+                onDismiss: () {
+                  context.pop();
+                },
               ),
             ),
           ),

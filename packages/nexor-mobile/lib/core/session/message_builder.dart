@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import '../../data/database/app_database.dart';
 import '../../data/database/daos/message_dao.dart';
 import '../ai/models/ai_message.dart';
@@ -61,15 +62,21 @@ class MessageBuilder {
         if (part.metadata != null) {
           try {
             final meta = _parseJson(part.metadata!);
+            if (meta.isEmpty) {
+              developer.log('Empty metadata for tool_use part: ${part.id}');
+              return null;
+            }
             return AIMessageContent.toolUse(
               meta['id'] as String,
               meta['name'] as String,
               meta['input'] as Map<String, dynamic>,
             );
           } catch (e) {
+            developer.log('Failed to parse tool_use metadata: $e');
             return null;
           }
         }
+        developer.log('Missing metadata for tool_use part: ${part.id}');
         return null;
 
       case 'tool_result':
@@ -77,14 +84,20 @@ class MessageBuilder {
         if (part.metadata != null) {
           try {
             final meta = _parseJson(part.metadata!);
+            if (meta.isEmpty) {
+              developer.log('Empty metadata for tool_result part: ${part.id}');
+              return null;
+            }
             return AIMessageContent.toolResult(
               meta['tool_use_id'] as String,
               part.content,
             );
           } catch (e) {
+            developer.log('Failed to parse tool_result metadata: $e');
             return null;
           }
         }
+        developer.log('Missing metadata for tool_result part: ${part.id}');
         return null;
 
       default:
@@ -98,8 +111,10 @@ class MessageBuilder {
       if (parsed is Map<String, dynamic>) {
         return parsed;
       }
+      developer.log('Parsed JSON is not a Map<String, dynamic>: $parsed');
       return {};
     } catch (e) {
+      developer.log('Failed to parse JSON: $e, input: $jsonString');
       return {};
     }
   }

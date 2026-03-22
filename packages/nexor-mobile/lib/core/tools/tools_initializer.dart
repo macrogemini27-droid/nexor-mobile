@@ -12,7 +12,7 @@ import '../ssh/sftp_client.dart';
 class ToolsInitializer {
   static ToolRegistry initializeTools(SSHClient sshClient) {
     final registry = ToolRegistry();
-    final sftpClient = SFTPClient(sshClient);
+    final sftpClient = SFTPClient(sshClient, allowedRoot: '/home');
 
     // Register SSH/Command Tools
     registry.register(BashTool(sshClient));

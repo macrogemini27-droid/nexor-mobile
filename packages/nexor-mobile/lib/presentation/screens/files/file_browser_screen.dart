@@ -6,9 +6,11 @@ import 'package:animate_do/animate_do.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/dimensions.dart';
 import '../../../core/theme/typography.dart';
+import '../../../core/errors/error_types.dart';
 import '../../widgets/common/nexor_app_bar.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/enhanced_error_state.dart';
+import '../../widgets/error_display.dart';
 import '../../widgets/file/file_item.dart';
 import '../../widgets/file/file_list_shimmer.dart';
 import '../../widgets/file/breadcrumb_nav.dart';
@@ -16,6 +18,7 @@ import '../../widgets/file/file_info_bar.dart';
 import '../../widgets/file/sort_filter_sheet.dart';
 import '../../../domain/entities/file_node.dart';
 import 'providers/files_provider.dart';
+import '../../providers/ssh_connection_provider.dart';
 
 class FileBrowserScreen extends ConsumerStatefulWidget {
   final String serverId;
@@ -270,26 +273,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen> {
               },
               loading: () => const FileListShimmer(),
               error: (error, stack) {
-                // Extract user-friendly message and technical details
-                final errorStr = error.toString();
-                String userMessage = errorStr;
-
-                // Parse Exception format: "Exception: message"
-                if (errorStr.startsWith('Exception: ')) {
-                  userMessage = errorStr.substring('Exception: '.length);
-                }
-
-                // Add stack trace as technical details
-                final technicalDetails =
-                    'Error: $errorStr\n\nStack Trace:\n$stack';
-
-                return EnhancedErrorState(
-                  title: 'Failed to Load Files',
-                  message: userMessage,
-                  technicalDetails: technicalDetails,
-                  onRetry: () {
-                    ref.invalidate(
-                        filesProvider(widget.serverId, _currentPath));
+                return ErrorDisplay(
+                  error: error,
+                  onRetry: error is AppException && error.retryable
+                      ? () {
+                          ref.invalidate(
+                              filesProvider(widget.serverId, _currentPath));
+                        }
+                      : null,
+                  onReconnect: error is ConnectionException || error is AuthException
+                      ? () {
+                          context.go('/servers');
+                        }
+                      : null,
+                  onDismiss: () {
+                    context.pop();
                   },
                 );
               },

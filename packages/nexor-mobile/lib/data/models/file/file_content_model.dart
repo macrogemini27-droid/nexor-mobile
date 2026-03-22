@@ -17,7 +17,7 @@ class FileContentModel {
 
   factory FileContentModel.fromJson(Map<String, dynamic> json) {
     return FileContentModel(
-      content: json['content'] as String,
+      content: json['content'] as String? ?? '',
       language: json['language'] as String? ?? 'plaintext',
       lines: json['lines'] as int? ?? 0,
       size: json['size'] as int? ?? 0,

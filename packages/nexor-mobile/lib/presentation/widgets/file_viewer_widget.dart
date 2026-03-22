@@ -42,7 +42,7 @@ class _FileViewerWidgetState extends ConsumerState<FileViewerWidget> {
         throw Exception('Not connected to SSH server');
       }
 
-      final sftpClient = SFTPClient(client);
+      final sftpClient = SFTPClient(client, allowedRoot: '/home');
       final result = await sftpClient.readFileWithPagination(
         widget.filePath,
         offset: offset,

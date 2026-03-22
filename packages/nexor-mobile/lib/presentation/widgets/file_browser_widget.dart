@@ -42,7 +42,7 @@ class _FileBrowserWidgetState extends ConsumerState<FileBrowserWidget> {
         throw Exception('Not connected to SSH server');
       }
 
-      final sftpClient = SFTPClient(client);
+      final sftpClient = SFTPClient(client, allowedRoot: '/home');
       final files = await sftpClient.listDirectory(_currentPath);
 
       if (!mounted) return;

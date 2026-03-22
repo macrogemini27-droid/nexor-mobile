@@ -13,18 +13,29 @@ part 'files_provider.g.dart';
 @riverpod
 FileRepository fileRepository(FileRepositoryRef ref) {
   final sshClient = ref.watch(sshClientProvider);
-  final sftpClient = SFTPClient(sshClient);
+  final sftpClient = SFTPClient(sshClient, allowedRoot: '/home');
+  
+  ref.onDispose(() async {
+    await sftpClient.close();
+  });
+  
   return FileRepositoryImpl(sshClient, sftpClient);
 }
 
 @riverpod
 class Files extends _$Files {
   Timer? _debounceTimer;
+  Completer<void>? _completer;
   
   @override
   Future<List<FileNode>> build(String serverId, String path) async {
     ref.onDispose(() {
       _debounceTimer?.cancel();
+      _debounceTimer = null;
+      if (_completer != null && !_completer!.isCompleted) {
+        _completer!.completeError(StateError('Provider disposed'));
+      }
+      _completer = null;
     });
     
     final repository = ref.watch(fileRepositoryProvider);
@@ -32,13 +43,29 @@ class Files extends _$Files {
   }
 
   Future<void> refresh() async {
-    // Cancel any pending refresh
     _debounceTimer?.cancel();
     
-    // Debounce rapid refresh calls
+    if (_completer != null && !_completer!.isCompleted) {
+      _completer!.completeError(StateError('Refresh cancelled'));
+    }
+    
+    final completer = Completer<void>();
+    _completer = completer;
+    
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      ref.invalidateSelf();
+      if (!completer.isCompleted) {
+        try {
+          ref.invalidateSelf();
+          completer.complete();
+        } catch (e) {
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        }
+      }
     });
+    
+    return completer.future;
   }
 }
 

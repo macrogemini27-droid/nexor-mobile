@@ -7,8 +7,10 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/utils/file_type_detector.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
+import '../../../core/errors/error_types.dart';
 import '../../widgets/common/loading_indicator.dart';
 import '../../widgets/common/enhanced_error_state.dart';
+import '../../widgets/error_display.dart';
 import '../../widgets/file/code_block.dart';
 import '../../widgets/file/file_info_bar.dart';
 import 'providers/files_provider.dart';
@@ -331,22 +333,21 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
         },
         loading: () => const Center(child: LoadingIndicator()),
         error: (error, stack) {
-          final errorStr = error.toString();
-          String userMessage = errorStr;
-
-          if (errorStr.startsWith('Exception: ')) {
-            userMessage = errorStr.substring('Exception: '.length);
-          }
-
-          final technicalDetails = 'Error: $errorStr\n\nStack Trace:\n$stack';
-
-          return EnhancedErrorState(
-            title: 'Failed to Load File',
-            message: userMessage,
-            technicalDetails: technicalDetails,
-            onRetry: () => ref.invalidate(
-              fileContentProvider(widget.serverId, widget.filePath),
-            ),
+          return ErrorDisplay(
+            error: error,
+            onRetry: error is AppException && error.retryable
+                ? () => ref.invalidate(
+                      fileContentProvider(widget.serverId, widget.filePath),
+                    )
+                : null,
+            onReconnect: error is ConnectionException || error is AuthException
+                ? () {
+                    context.go('/servers');
+                  }
+                : null,
+            onDismiss: () {
+              context.pop();
+            },
           );
         },
       ),

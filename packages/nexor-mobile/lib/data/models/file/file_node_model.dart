@@ -38,16 +38,23 @@ class FileNodeModel extends HiveObject {
 
   factory FileNodeModel.fromJson(Map<String, dynamic> json) {
     return FileNodeModel(
-      name: json['name'] as String,
-      path: json['path'] as String,
-      isDirectory: json['isDirectory'] as bool,
+      name: json['name'] as String? ?? '',
+      path: json['path'] as String? ?? '',
+      isDirectory: json['isDirectory'] as bool? ?? false,
       size: json['size'] as int? ?? 0,
-      modifiedAt: json['modifiedAt'] != null
-          ? DateTime.parse(json['modifiedAt'] as String)
-          : DateTime.now(),
+      modifiedAt: _parseDateTime(json['modifiedAt']),
       gitStatus: json['gitStatus'] as String?,
       mimeType: json['mimeType'] as String?,
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    try {
+      return DateTime.parse(value.toString());
+    } catch (e) {
+      return DateTime.now();
+    }
   }
 
   Map<String, dynamic> toJson() {

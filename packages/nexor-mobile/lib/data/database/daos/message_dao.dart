@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:drift/drift.dart';
 import '../app_database.dart';
 import '../tables/messages_table.dart';
@@ -59,14 +60,16 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
     required String messageId,
     required String type,
     required String content,
-    String? metadata,
+    Map<String, dynamic>? metadata,
   }) async {
     final part = MessagePartsCompanion.insert(
       id: id,
       messageId: messageId,
       type: type,
       content: content,
-      metadata: Value(metadata),
+      metadata: metadata != null
+          ? Value(jsonEncode(metadata))
+          : const Value.absent(),
     );
     await into(messageParts).insert(part);
   }

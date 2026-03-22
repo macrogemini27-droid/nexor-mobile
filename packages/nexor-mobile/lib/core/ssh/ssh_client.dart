@@ -126,25 +126,35 @@ class SSHClient {
     throw Exception('Failed to connect after $maxRetries attempts');
   }
 
+  /// Escape a shell argument by wrapping in single quotes and escaping internal quotes
+  String _escapeShellArgument(String arg) {
+    // Replace each single quote with '\'' (end quote, escaped quote, start quote)
+    final escaped = arg.replaceAll("'", "'\\''");
+    // Wrap in single quotes
+    return "'$escaped'";
+  }
+
   /// Execute a command on the remote server
   Future<CommandResult> execute(
     String command, {
     String? workingDirectory,
+    Duration? timeout,
   }) async {
     if (_client == null || !isConnected) {
       throw Exception('Not connected to SSH server');
     }
 
     final startTime = DateTime.now();
+    final effectiveTimeout = timeout ?? const Duration(seconds: 30);
 
     try {
-      // Change directory if specified
+      // Build command with proper shell escaping
       final fullCommand = workingDirectory != null
-          ? 'cd "$workingDirectory" && $command'
+          ? 'cd ${_escapeShellArgument(workingDirectory)} && $command'
           : command;
 
-      // Execute command
-      final result = await _client!.run(fullCommand);
+      // Execute command with timeout
+      final result = await _client!.run(fullCommand).timeout(effectiveTimeout);
 
       final executionTime = DateTime.now().difference(startTime);
 
@@ -158,6 +168,14 @@ class SSHClient {
         stdout: String.fromCharCodes(result),
         stderr: '',
         exitCode: 0,
+        executionTime: executionTime,
+      );
+    } on TimeoutException {
+      final executionTime = DateTime.now().difference(startTime);
+      return CommandResult(
+        stdout: '',
+        stderr: 'Command execution timed out after ${effectiveTimeout.inSeconds}s',
+        exitCode: 124,
         executionTime: executionTime,
       );
     } catch (e) {
