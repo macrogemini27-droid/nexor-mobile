@@ -1,14 +1,15 @@
-import 'dart:async';
+import 'dart:async' as async;
 import 'package:dartssh2/dartssh2.dart' as dartssh2;
 import 'models/ssh_config.dart';
 import 'models/command_result.dart';
 import 'ssh_session.dart';
+import '../errors/error_types.dart';
 
 class SSHClient {
   dartssh2.SSHClient? _client;
   SSHSession? _session;
-  final StreamController<SSHSession> _sessionController =
-      StreamController<SSHSession>.broadcast();
+  final async.StreamController<SSHSession> _sessionController =
+      async.StreamController<SSHSession>.broadcast();
 
   Stream<SSHSession> get sessionStream => _sessionController.stream;
   SSHSession? get currentSession => _session;
@@ -58,7 +59,7 @@ class SSHClient {
 
       // Wait for authentication to complete
       if (_client == null) {
-        throw Exception('SSH client not initialized');
+        throw ConnectionException('SSH client not initialized');
       }
       await _client!.authenticated;
 
@@ -68,7 +69,7 @@ class SSHClient {
         _sessionController.add(_session!);
         return _session!;
       }
-      throw Exception('Session not initialized after connection');
+      throw ConnectionException('Session not initialized after connection');
     } catch (e) {
       // Update state to error
       _session = _session?.updateState(
@@ -118,12 +119,12 @@ class SSHClient {
         }
 
         // Wait before retrying with exponential backoff
-        await Future.delayed(delay);
+        await async.Future.delayed(delay);
         delay *= 2; // Exponential backoff
       }
     }
 
-    throw Exception('Failed to connect after $maxRetries attempts');
+    throw ConnectionException('Failed to connect after $maxRetries attempts');
   }
 
   /// Escape a shell argument by wrapping in single quotes and escaping internal quotes
@@ -146,7 +147,7 @@ class SSHClient {
     }
 
     if (_client == null || !isConnected) {
-      throw Exception('Not connected to SSH server');
+      throw ConnectionException('Not connected to SSH server');
     }
 
     final startTime = DateTime.now();
@@ -175,7 +176,7 @@ class SSHClient {
         exitCode: 0,
         executionTime: executionTime,
       );
-    } on TimeoutException {
+    } on async.TimeoutException {
       final executionTime = DateTime.now().difference(startTime);
       return CommandResult(
         stdout: '',

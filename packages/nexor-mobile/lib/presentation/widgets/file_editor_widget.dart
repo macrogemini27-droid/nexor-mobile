@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/ssh/sftp_client.dart';
+import '../../core/errors/error_types.dart';
 import '../providers/ssh_connection_provider.dart';
 
 class FileEditorWidget extends ConsumerStatefulWidget {
@@ -57,7 +58,7 @@ class _FileEditorWidgetState extends ConsumerState<FileEditorWidget> {
     try {
       final client = ref.read(sshClientProvider);
       if (!client.isConnected) {
-        throw Exception('Not connected to SSH server');
+        throw ConnectionException('Not connected to SSH server');
       }
 
       final sftpClient = SFTPClient(client, allowedRoot: '/home');
@@ -89,7 +90,7 @@ class _FileEditorWidgetState extends ConsumerState<FileEditorWidget> {
     try {
       final client = ref.read(sshClientProvider);
       if (!client.isConnected) {
-        throw Exception('Not connected to SSH server');
+        throw ConnectionException('Not connected to SSH server');
       }
 
       final sftpClient = SFTPClient(client, allowedRoot: '/home');

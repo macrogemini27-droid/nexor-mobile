@@ -174,6 +174,28 @@ class ErrorDisplay extends StatelessWidget {
       );
     }
 
+    if (error is OperationTimeoutException) {
+      return _ErrorInfo(
+        icon: Icons.timer_off,
+        title: 'Operation Timed Out',
+        message: 'The operation took too long to complete',
+        details: error.operation,
+        retryable: true,
+        needsReconnect: false,
+      );
+    }
+
+    if (error is PathValidationException) {
+      return _ErrorInfo(
+        icon: Icons.security,
+        title: 'Invalid Path',
+        message: error.message,
+        details: error.details,
+        retryable: false,
+        needsReconnect: false,
+      );
+    }
+
     if (error is BinaryFileException) {
       return _ErrorInfo(
         icon: Icons.insert_drive_file,

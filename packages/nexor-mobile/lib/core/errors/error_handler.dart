@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async' as async;
 import 'dart:developer' as developer;
 import 'package:dartssh2/dartssh2.dart';
 import 'error_types.dart';
@@ -18,9 +19,9 @@ class ErrorHandler {
       );
     }
     
-    // Timeout errors
-    if (error is TimeoutException) {
-      return TimeoutException(context ?? 'operation');
+    // Timeout errors - use qualified name to avoid collision with custom exception
+    if (error is async.TimeoutException) {
+      return OperationTimeoutException(context ?? 'operation');
     }
     
     // SSH/SFTP errors
@@ -41,17 +42,17 @@ class ErrorHandler {
     );
   }
   
-  static AppException _handleSftpError(SftpError error) {
+  static AppException _handleSftpError(SftpError error, {String? path}) {
     final msg = error.message.toLowerCase();
     
-    // No such file
+    // No such file - preserve path if available
     if (msg.contains('no such file') || msg.contains('not found')) {
-      return FileNotFoundException('unknown');
+      return FileNotFoundException(path ?? _extractPathFromMessage(error.message) ?? 'unknown');
     }
     
-    // Permission denied
+    // Permission denied - preserve path if available
     if (msg.contains('permission denied')) {
-      return PermissionException('unknown');
+      return PermissionException(path ?? _extractPathFromMessage(error.message) ?? 'unknown');
     }
     
     // Connection issues
@@ -60,6 +61,23 @@ class ErrorHandler {
     }
     
     return SftpException('SFTP operation failed', details: error.message);
+  }
+  
+  static String? _extractPathFromMessage(String message) {
+    // Try to extract path from common error message patterns
+    final patterns = [
+      RegExp(r"'([^']+)'"),
+      RegExp(r'"([^"]+)"'),
+      RegExp(r':\s*(/[^\s]+)'),
+    ];
+    
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(message);
+      if (match != null && match.groupCount > 0) {
+        return match.group(1);
+      }
+    }
+    return null;
   }
   
   static AppException _handleFileSystemError(FileSystemException error) {
@@ -77,7 +95,7 @@ class ErrorHandler {
     
     // ETIMEDOUT (110) - Connection timed out
     if (code == 110) {
-      return TimeoutException('file operation');
+      return OperationTimeoutException('file operation');
     }
     
     return AppException(

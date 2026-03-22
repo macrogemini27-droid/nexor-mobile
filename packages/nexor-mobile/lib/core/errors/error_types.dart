@@ -33,10 +33,11 @@ class PermissionException extends AppException {
       : super('Permission denied: $path', retryable: false);
 }
 
-class TimeoutException extends AppException {
+// Renamed from TimeoutException to avoid collision with dart:async.TimeoutException
+class OperationTimeoutException extends AppException {
   final String operation;
   
-  TimeoutException(this.operation)
+  OperationTimeoutException(this.operation)
       : super('Operation timed out: $operation', retryable: true);
 }
 

@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' as async;
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
@@ -34,8 +34,8 @@ class SFTPClient {
     
     try {
       _sftpClient = await client.sftp().timeout(timeout);
-    } on TimeoutException {
-      throw TimeoutException('SFTP connection');
+    } on async.TimeoutException {
+      throw OperationTimeoutException('SFTP connection');
     } catch (e) {
       throw ErrorHandler.handle(e, context: 'SFTP connection');
     }
@@ -62,8 +62,8 @@ class SFTPClient {
       } catch (e) {
         throw BinaryFileException(content.length);
       }
-    } on TimeoutException {
-      throw TimeoutException('file read');
+    } on async.TimeoutException {
+      throw OperationTimeoutException('file read');
     } catch (e) {
       throw ErrorHandler.handle(e, context: 'readFile');
     } finally {
@@ -115,8 +115,8 @@ class SFTPClient {
 
       final bytes = utf8.encode(content);
       await file.writeBytes(Uint8List.fromList(bytes)).timeout(timeout);
-    } on TimeoutException {
-      throw TimeoutException('file write');
+    } on async.TimeoutException {
+      throw OperationTimeoutException('file write');
     } catch (e) {
       throw ErrorHandler.handle(e, context: 'writeFile');
     } finally {
@@ -145,8 +145,8 @@ class SFTPClient {
 
       final bytes = utf8.encode(content);
       await file.writeBytes(Uint8List.fromList(bytes)).timeout(timeout);
-    } on TimeoutException {
-      throw TimeoutException('file append');
+    } on async.TimeoutException {
+      throw OperationTimeoutException('file append');
     } catch (e) {
       throw ErrorHandler.handle(e, context: 'appendFile');
     } finally {
@@ -165,10 +165,16 @@ class SFTPClient {
       }
       await sftp.stat(filePath).timeout(timeout);
       return true;
-    } on TimeoutException {
-      return false;
+    } on async.TimeoutException {
+      // Only swallow timeout - could indicate network issues but not file existence
+      throw OperationTimeoutException('file stat');
     } catch (e) {
-      return false;
+      // Only return false for "not found" errors, throw others
+      final handler = ErrorHandler.handle(e, context: 'fileExists');
+      if (handler is FileNotFoundException) {
+        return false;
+      }
+      throw handler;
     }
   }
 
@@ -192,8 +198,8 @@ class SFTPClient {
         isFile: stat.isFile,
         permissions: stat.mode?.value ?? 0,
       );
-    } on TimeoutException {
-      throw TimeoutException('get metadata');
+    } on async.TimeoutException {
+      throw OperationTimeoutException('get metadata');
     } catch (e) {
       throw ErrorHandler.handle(e, context: 'getFileMetadata');
     }
@@ -211,8 +217,8 @@ class SFTPClient {
       }
       final items = await sftp.listdir(validated).timeout(timeout);
       return items.map((item) => item.filename).toList();
-    } on TimeoutException {
-      throw TimeoutException('list directory');
+    } on async.TimeoutException {
+      throw OperationTimeoutException('list directory');
     } catch (e) {
       throw ErrorHandler.handle(e, context: 'listDirectory');
     }
@@ -229,8 +235,8 @@ class SFTPClient {
         throw SftpException('SFTP client not initialized');
       }
       await sftp.remove(validated).timeout(timeout);
-    } on TimeoutException {
-      throw TimeoutException('file delete');
+    } on async.TimeoutException {
+      throw OperationTimeoutException('file delete');
     } catch (e) {
       throw ErrorHandler.handle(e, context: 'deleteFile');
     }
@@ -248,8 +254,8 @@ class SFTPClient {
         throw SftpException('SFTP client not initialized');
       }
       await sftp.rename(validatedOld, validatedNew).timeout(timeout);
-    } on TimeoutException {
-      throw TimeoutException('file rename');
+    } on async.TimeoutException {
+      throw OperationTimeoutException('file rename');
     } catch (e) {
       throw ErrorHandler.handle(e, context: 'renameFile');
     }

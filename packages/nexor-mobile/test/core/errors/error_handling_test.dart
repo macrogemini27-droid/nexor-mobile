@@ -24,8 +24,8 @@ void main() {
       expect(error.path, '/test/file.txt');
     });
 
-    test('TimeoutException is retryable', () {
-      final error = TimeoutException('file read');
+    test('OperationTimeoutException is retryable', () {
+      final error = OperationTimeoutException('file read');
       expect(error.retryable, true);
       expect(error.operation, 'file read');
     });
@@ -190,7 +190,7 @@ void main() {
       final errors = [
         NetworkException('Network error'),
         ConnectionException('Connection error'),
-        TimeoutException('timeout'),
+        OperationTimeoutException('timeout'),
         SftpException('SFTP error'),
       ];
       
