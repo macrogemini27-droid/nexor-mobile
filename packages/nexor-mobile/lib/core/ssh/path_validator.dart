@@ -1,4 +1,3 @@
-import 'dart:io';
 import '../errors/error_types.dart';
 
 /// Validates file paths to prevent path traversal attacks

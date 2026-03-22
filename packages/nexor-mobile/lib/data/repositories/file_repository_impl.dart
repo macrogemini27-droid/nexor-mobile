@@ -28,7 +28,9 @@ class FileRepositoryImpl implements FileRepository {
           // Use single ls command to get all metadata at once (fixes N+1 problem)
           // Format: permissions links owner group size month day time/year name
           final normalizedPath = path.endsWith('/') && path != '/' ? path.substring(0, path.length - 1) : path;
-          final command = 'ls -la --time-style=+%s "$normalizedPath" 2>/dev/null | tail -n +2';
+          // Escape path to prevent command injection
+          final escapedPath = _sshClient.escapeShellArgument(normalizedPath);
+          final command = 'ls -la --time-style=+%s $escapedPath 2>/dev/null | tail -n +2';
           final result = await _sshClient.execute(command);
 
           if (result.exitCode != 0) {
@@ -179,7 +181,9 @@ class FileRepositoryImpl implements FileRepository {
     try {
       // Use single ls command to get all files with metadata at once
       final normalizedPath = path.endsWith('/') && path != '/' ? path.substring(0, path.length - 1) : path;
-      final command = 'ls -la --time-style=+%s "$normalizedPath" 2>/dev/null | tail -n +2';
+      // Escape path to prevent command injection
+      final escapedPath = _sshClient.escapeShellArgument(normalizedPath);
+      final command = 'ls -la --time-style=+%s $escapedPath 2>/dev/null | tail -n +2';
       final result = await _sshClient.execute(command);
 
       if (result.exitCode != 0) return;
@@ -250,7 +254,9 @@ class FileRepositoryImpl implements FileRepository {
     try {
       // Use single ls command to get all files with metadata at once
       final normalizedPath = path.endsWith('/') && path != '/' ? path.substring(0, path.length - 1) : path;
-      final command = 'ls -la --time-style=+%s "$normalizedPath" 2>/dev/null | tail -n +2';
+      // Escape path to prevent command injection
+      final escapedPath = _sshClient.escapeShellArgument(normalizedPath);
+      final command = 'ls -la --time-style=+%s $escapedPath 2>/dev/null | tail -n +2';
       final result = await _sshClient.execute(command);
 
       if (result.exitCode != 0) return;

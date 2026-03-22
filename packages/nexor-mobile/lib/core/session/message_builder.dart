@@ -63,8 +63,7 @@ class MessageBuilder {
           try {
             final meta = _parseJson(part.metadata!);
             if (meta.isEmpty) {
-              developer.log('Empty metadata for tool_use part: ${part.id}');
-              return null;
+              throw FormatException('Empty metadata for tool_use part: ${part.id}');
             }
             return AIMessageContent.toolUse(
               meta['id'] as String,
@@ -85,8 +84,7 @@ class MessageBuilder {
           try {
             final meta = _parseJson(part.metadata!);
             if (meta.isEmpty) {
-              developer.log('Empty metadata for tool_result part: ${part.id}');
-              return null;
+              throw FormatException('Empty metadata for tool_result part: ${part.id}');
             }
             return AIMessageContent.toolResult(
               meta['tool_use_id'] as String,

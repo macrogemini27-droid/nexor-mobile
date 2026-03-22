@@ -127,7 +127,8 @@ class SSHClient {
   }
 
   /// Escape a shell argument by wrapping in single quotes and escaping internal quotes
-  String _escapeShellArgument(String arg) {
+  /// This prevents command injection by ensuring special characters are treated literally
+  String escapeShellArgument(String arg) {
     // Replace each single quote with '\'' (end quote, escaped quote, start quote)
     final escaped = arg.replaceAll("'", "'\\''");
     // Wrap in single quotes
@@ -140,6 +141,10 @@ class SSHClient {
     String? workingDirectory,
     Duration? timeout,
   }) async {
+    if (command.isEmpty) {
+      throw ArgumentError('Command cannot be empty');
+    }
+
     if (_client == null || !isConnected) {
       throw Exception('Not connected to SSH server');
     }
@@ -150,7 +155,7 @@ class SSHClient {
     try {
       // Build command with proper shell escaping
       final fullCommand = workingDirectory != null
-          ? 'cd ${_escapeShellArgument(workingDirectory)} && $command'
+          ? 'cd ${escapeShellArgument(workingDirectory)} && $command'
           : command;
 
       // Execute command with timeout
